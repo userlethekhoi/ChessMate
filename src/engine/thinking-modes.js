@@ -1,0 +1,50 @@
+/**
+ * ChessMate Thinking Modes configuration (Icon-free)
+ */
+
+export const THINKING_MODES = {
+  mate_hunt: {
+    id: 'mate_hunt',
+    name: 'Săn Chiếu Hết (Mate Hunter)',
+    badge: 'Chiếu Hết',
+    depthBonus: 3,
+    movetimeMultiplier: 1.3,
+    contempt: 100, // Do not accept draws, aggressively seek checkmate
+    description: 'Ưu tiên tối đa tìm kiếm biến thể chiếu hết nhanh nhất, dồn ép Vua đối phương.',
+    evalNote: (evalScore) => evalScore >= 900 ? 'Đã tìm thấy đòn Chiếu Hết' : 'Đang dồn ép tìm nước chiếu bí'
+  },
+  solid_defense: {
+    id: 'solid_defense',
+    name: 'Phòng Thủ & Cầu Hòa (Iron Defense)',
+    badge: 'Phòng Thủ',
+    depthBonus: 2,
+    movetimeMultiplier: 1.2,
+    contempt: -100, // Strongly favor draws and safe play when under pressure
+    description: 'Phòng thủ thông minh khi bị dồn ép, vô hiệu hóa đòn hiểm của đối thủ và tìm đường cầu hòa.',
+    evalNote: (evalScore) => evalScore < -1 ? 'Kích hoạt phòng ngự kiên cố tìm đường hòa' : 'Giữ thế trận vững chắc'
+  },
+  aggressive: {
+    id: 'aggressive',
+    name: 'Tấn Công Dồn Ép (Aggressive Attack)',
+    badge: 'Tấn Công',
+    depthBonus: 1,
+    movetimeMultiplier: 1.1,
+    contempt: 50,
+    description: 'Tung đòn tấn công cánh Vua, mở đường các quân mạnh và phá vỡ cấu trúc tốt đối phương.',
+    evalNote: () => 'Đang gia tăng sức ép tấn công'
+  },
+  balanced: {
+    id: 'balanced',
+    name: 'Kiện Tướng Cân Bằng (Grandmaster Balanced)',
+    badge: 'Cân Bằng',
+    depthBonus: 0,
+    movetimeMultiplier: 1.0,
+    contempt: 0,
+    description: 'Lối đánh chuẩn chỉ của Kiện tướng Quốc tế, cân bằng giữa tấn công và thế trận vững chắc.',
+    evalNote: () => 'Nước cờ chuẩn xác theo nguyên tắc lý thuyết'
+  }
+};
+
+export function getModeConfig(modeKey = 'mate_hunt') {
+  return THINKING_MODES[modeKey] || THINKING_MODES.mate_hunt;
+}

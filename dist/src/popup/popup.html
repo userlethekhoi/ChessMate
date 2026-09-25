@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <title>CHESSMATE - HỆ THỐNG TRỢ THỦ</title>
+  <script type="module" crossorigin src="/assets/popup-SkFyWNkZ.js"></script>
+  <link rel="modulepreload" crossorigin href="/assets/modulepreload-polyfill-P2Xu9kJm.js">
+  <link rel="modulepreload" crossorigin href="/assets/config-manager-MOj5odmI.js">
+  <link rel="modulepreload" crossorigin href="/assets/thinking-modes-zB3v2kIJ.js">
+  <link rel="stylesheet" crossorigin href="/assets/popup-CRSqQpAH.css">
+</head>
+<body>
+  <div class="app-shell">
+    <!-- Header chính -->
+    <header class="app-header">
+      <div class="header-brand">
+        <h1 class="header-title">CHESSMATE - TRỢ THỦ CỜ VUA</h1>
+        <span class="header-tag">HỆ THỐNG PHÂN TÍCH CHUẨN XÁC</span>
+      </div>
+      <label class="toggle-control" title="Bật hoặc Tắt Trợ Thủ">
+        <input id="enabled" type="checkbox">
+        <span class="toggle-track"></span>
+      </label>
+    </header>
+
+    <main class="app-main">
+      <!-- Phần 1: Chế Độ Tư Duy -->
+      <section class="panel-box">
+        <div class="panel-header">
+          <span class="panel-label">1 - CẤU HÌNH CHẾ ĐỘ TƯ DUY</span>
+        </div>
+
+        <div class="field-block">
+          <label for="thinkingMode" class="field-label">Mục tiêu chiến thuật</label>
+          <select id="thinkingMode" class="field-select">
+            <option value="mate_hunt">Săn Chiếu Hết (Mate Hunter)</option>
+            <option value="solid_defense">Phòng Thủ & Cầu Hòa (Iron Defense)</option>
+            <option value="aggressive">Tấn Công Dồn Ép (Aggressive Attack)</option>
+            <option value="balanced">Kiện Tướng Cân Bằng (Balanced)</option>
+          </select>
+          <div id="thinkingModeDesc" class="field-hint">Ưu tiên tìm đường chiếu hết ngắn nhất.</div>
+        </div>
+
+        <div class="field-block">
+          <label class="field-label">Phương thức vận hành</label>
+          <div class="tab-segments">
+            <label class="segment-item">
+              <input name="mode" value="suggest" type="radio" checked>
+              <span class="segment-label">Chỉ gợi ý</span>
+            </label>
+            <label class="segment-item">
+              <input name="mode" value="auto" type="radio">
+              <span class="segment-label">Tự động đánh</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="grid-pair">
+          <div class="field-block">
+            <div class="label-row">
+              <span class="field-label">Độ sâu (Depth)</span>
+              <output id="depthOut" class="metric-badge">16</output>
+            </div>
+            <input id="depth" type="range" min="8" max="25" value="16" class="field-slider">
+          </div>
+          <div class="field-block">
+            <div class="label-row">
+              <span class="field-label">Cấp độ (Skill)</span>
+              <output id="skillOut" class="metric-badge">20</output>
+            </div>
+            <input id="skillLevel" type="range" min="0" max="20" value="20" class="field-slider">
+          </div>
+        </div>
+
+        <div class="field-block stack-gap">
+          <label class="check-item">
+            <input id="showHud" type="checkbox" checked>
+            <span class="check-label">Hiển thị Cửa Sổ Trợ Thủ trên trang</span>
+          </label>
+          <label class="check-item">
+            <input id="showArrows" type="checkbox" checked>
+            <span class="check-label">Vẽ mũi tên gợi ý trên bàn cờ</span>
+          </label>
+        </div>
+
+        <div class="btn-group">
+          <button id="saveGameConfig" class="btn btn-accent">
+            Lưu Cấu Hình Game
+          </button>
+          <button id="reopenHud" class="btn btn-neutral">
+            Mở Cửa Sổ HUD
+          </button>
+        </div>
+        <div id="gameStatus" class="diag-text"></div>
+      </section>
+
+      <!-- Phần 2: Chẩn Đoán & Kiểm Tra Toàn Bộ -->
+      <section class="panel-box">
+        <div class="panel-header">
+          <span class="panel-label">2 - CHẨN ĐOÁN HỆ THỐNG</span>
+        </div>
+        
+        <p class="panel-desc">Kiểm tra kết nối tuần tự: Động cơ Stockfish, Service Worker, Tab bàn cờ và Khóa API.</p>
+
+        <button id="testAllBtn" class="btn btn-full btn-outline">
+          CHẠY KIỂM TRA TOÀN BỘ (TEST ALL)
+        </button>
+
+        <div id="diagConsole" class="diag-console">
+          <div class="diag-line muted">[SẴN SÀNG] Bấm nút trên để bắt đầu kiểm tra</div>
+        </div>
+      </section>
+
+      <!-- Phần 3: Cấu Hình API Key Độc Lập -->
+      <section class="panel-box">
+        <div class="panel-header">
+          <span class="panel-label">3 - CẤU HÌNH API BỔ TRỢ</span>
+        </div>
+        
+        <p class="panel-desc">Tùy chọn bổ sung cho phân tích văn bản chuyên sâu.</p>
+
+        <div class="field-block">
+          <label for="llmProvider" class="field-label">Nhà cung cấp</label>
+          <select id="llmProvider" class="field-select">
+            <option value="gemini">Google Gemini (Gemini 1.5 / 2.0 Flash)</option>
+            <option value="openai">OpenAI (GPT-4o-mini)</option>
+          </select>
+        </div>
+
+        <div class="field-block">
+          <label for="llmApiKey" class="field-label">Khóa API Key</label>
+          <div class="input-action-row">
+            <input id="llmApiKey" type="password" placeholder="Nhập khóa AIzaSy... hoặc sk-..." class="field-input">
+            <button id="toggleApiKeyVis" type="button" class="btn-side">XEM</button>
+          </div>
+          <div class="field-hint">Mẹo: Lấy key miễn phí tại Google AI Studio (aistudio.google.com).</div>
+        </div>
+
+        <div class="btn-group">
+          <button id="saveApiKeyBtn" class="btn btn-accent">
+            Lưu API Key
+          </button>
+          <button id="testApiKeyBtn" class="btn btn-neutral">
+            Kiểm Tra API
+          </button>
+        </div>
+        <div id="apiKeyStatus" class="diag-text"></div>
+      </section>
+    </main>
+  </div>
+
+</body>
+</html>

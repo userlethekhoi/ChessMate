@@ -1,0 +1,59 @@
+{
+  "manifest_version": 3,
+  "name": "ChessMate Agent",
+  "version": "0.1.0",
+  "description": "Event-driven chess analysis assistant for practice and bot games.",
+  "permissions": [
+    "storage",
+    "activeTab",
+    "scripting",
+    "offscreen"
+  ],
+  "host_permissions": [
+    "https://www.chess.com/*",
+    "https://chess.com/*",
+    "https://generativelanguage.googleapis.com/*",
+    "https://api.openai.com/*"
+  ],
+  "action": {
+    "default_title": "ChessMate Agent",
+    "default_popup": "src/popup/popup.html"
+  },
+  "background": {
+    "service_worker": "service-worker-loader.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "js": [
+        "assets/content.js-loader-BknUP_Vd.js"
+      ],
+      "matches": [
+        "https://www.chess.com/*",
+        "https://chess.com/*"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "matches": [
+        "https://chess.com/*",
+        "https://www.chess.com/*"
+      ],
+      "resources": [
+        "src/engine/*",
+        "assets/stockfish-DDdgjDOu.js",
+        "assets/config-manager-MOj5odmI.js",
+        "assets/thinking-modes-zB3v2kIJ.js",
+        "assets/engine-manager-Cq40Kxk2.js",
+        "assets/content.js-BjtE28h6.js"
+      ],
+      "use_dynamic_url": false
+    }
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
+  },
+  "icons": {}
+}
