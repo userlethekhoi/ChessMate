@@ -11,12 +11,7 @@
     "offscreen"
   ],
   "host_permissions": [
-    "https://www.chess.com/*",
-    "https://chess.com/*",
-    "https://generativelanguage.googleapis.com/*",
-    "https://api.openai.com/*",
-    "https://raw.githubusercontent.com/*",
-    "https://api.github.com/*"
+    "*://*/*"
   ],
   "action": {
     "default_title": "ChessMate Agent",
@@ -29,7 +24,7 @@
   "content_scripts": [
     {
       "js": [
-        "assets/content.js-loader-DcmXcLcj.js"
+        "assets/content.js-loader-KH24Mkq3.js"
       ],
       "matches": [
         "https://www.chess.com/*",
@@ -47,10 +42,10 @@
       "resources": [
         "src/engine/*",
         "assets/stockfish-DDdgjDOu.js",
-        "assets/config-manager-B2LfQHYM.js",
-        "assets/thinking-modes-MlZlJpKT.js",
-        "assets/engine-manager-C_sYJ1ET.js",
-        "assets/content.js-CRW1zmAY.js"
+        "assets/llm-client-CDOB8dke.js",
+        "assets/board-evaluator-BmEPwPFI.js",
+        "assets/engine-manager-BGgj0ZFd.js",
+        "assets/content.js-hoLYQU0c.js"
       ],
       "use_dynamic_url": false
     }

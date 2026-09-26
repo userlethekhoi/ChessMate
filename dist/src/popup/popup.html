@@ -2,12 +2,13 @@
 <html lang="vi">
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>CHESSMATE - HỆ THỐNG TRỢ THỦ</title>
-  <script type="module" crossorigin src="/assets/popup-CQyJcz10.js"></script>
+  <script type="module" crossorigin src="/assets/popup-4CEcMxt0.js"></script>
   <link rel="modulepreload" crossorigin href="/assets/modulepreload-polyfill-P2Xu9kJm.js">
-  <link rel="modulepreload" crossorigin href="/assets/config-manager-B2LfQHYM.js">
-  <link rel="modulepreload" crossorigin href="/assets/thinking-modes-MlZlJpKT.js">
-  <link rel="stylesheet" crossorigin href="/assets/popup-CRSqQpAH.css">
+  <link rel="modulepreload" crossorigin href="/assets/board-evaluator-BmEPwPFI.js">
+  <link rel="modulepreload" crossorigin href="/assets/llm-client-CDOB8dke.js">
+  <link rel="stylesheet" crossorigin href="/assets/popup-BIiElxvR.css">
 </head>
 <body>
   <div class="app-shell">
@@ -111,34 +112,52 @@
         </div>
       </section>
 
-      <!-- Phần 3: Cấu Hình API Key Độc Lập -->
+      <!-- Phần 3: Cấu Hình AI Phân Tích Thế Trận Tùy Ý -->
       <section class="panel-box">
         <div class="panel-header">
-          <span class="panel-label">3 - CẤU HÌNH API BỔ TRỢ</span>
+          <span class="panel-label">3 - CẤU HÌNH AI PHÂN TÍCH THẾ TRẬN</span>
         </div>
         
-        <p class="panel-desc">Tùy chọn bổ sung cho phân tích văn bản chuyên sâu.</p>
+        <p class="panel-desc">Tự do kết nối bất kỳ AI nào (Gemini, ChatGPT, DeepSeek, Claude, v.v.).</p>
 
         <div class="field-block">
-          <label for="llmProvider" class="field-label">Nhà cung cấp</label>
+          <label for="llmProvider" class="field-label">Mô hình AI / Nhà cung cấp</label>
           <select id="llmProvider" class="field-select">
-            <option value="gemini">Google Gemini (Gemini 1.5 / 2.0 Flash)</option>
-            <option value="openai">OpenAI (GPT-4o-mini)</option>
+            <option value="gemini">Google Gemini (Gemini 2.0 / 1.5 Flash - Miễn phí)</option>
+            <option value="openai">OpenAI (ChatGPT / GPT-4o-mini)</option>
+            <option value="deepseek">DeepSeek (deepseek-chat / deepseek-reasoner)</option>
+            <option value="openrouter">OpenRouter (Dùng Claude, Llama, v.v. qua 1 Key)</option>
+            <option value="groq">Groq Cloud (Llama 3.3 - Phản hồi siêu tốc)</option>
+            <option value="custom">⚡ Tùy chỉnh (Thêm bất kỳ AI nào / Custom Endpoint)</option>
           </select>
+        </div>
+
+        <!-- Ô nhập Endpoint URL (Cho Custom hoặc chỉnh sửa) -->
+        <div class="field-block" id="llmEndpointBlock" style="display:none;">
+          <label for="llmEndpoint" class="field-label">Địa chỉ API (Endpoint URL)</label>
+          <input id="llmEndpoint" type="text" placeholder="https://api.domain.com/v1/chat/completions" class="field-input">
+          <div class="field-hint" id="llmEndpointHint">Nhập URL endpoint chuẩn OpenAI-compatible.</div>
+        </div>
+
+        <!-- Ô nhập Tên Model -->
+        <div class="field-block" id="llmModelBlock" style="display:none;">
+          <label for="llmModel" class="field-label">Tên Mô Hình (Model ID)</label>
+          <input id="llmModel" type="text" placeholder="Ví dụ: claude-3-5-sonnet, deepseek-chat, gpt-4o" class="field-input">
+          <div class="field-hint" id="llmModelHint">Tên định danh model của nhà cung cấp.</div>
         </div>
 
         <div class="field-block">
           <label for="llmApiKey" class="field-label">Khóa API Key</label>
           <div class="input-action-row">
-            <input id="llmApiKey" type="password" placeholder="Nhập khóa AIzaSy... hoặc sk-..." class="field-input">
+            <input id="llmApiKey" type="password" placeholder="Nhập khóa API..." class="field-input">
             <button id="toggleApiKeyVis" type="button" class="btn-side">XEM</button>
           </div>
-          <div class="field-hint">Mẹo: Lấy key miễn phí tại Google AI Studio (aistudio.google.com).</div>
+          <div id="llmProviderHint" class="field-hint">Mẹo: Lấy key miễn phí tại Google AI Studio (aistudio.google.com).</div>
         </div>
 
         <div class="btn-group">
           <button id="saveApiKeyBtn" class="btn btn-accent">
-            Lưu API Key
+            Lưu Cấu Hình AI
           </button>
           <button id="testApiKeyBtn" class="btn btn-neutral">
             Kiểm Tra API

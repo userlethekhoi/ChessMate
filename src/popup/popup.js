@@ -1,5 +1,6 @@
 import { getConfig, setConfig } from '../storage/config-manager.js';
 import { getModeConfig } from '../engine/thinking-modes.js';
+import { PROVIDER_PRESETS } from '../ai/llm-client.js';
 
 const $ = id => document.getElementById(id);
 
@@ -35,14 +36,15 @@ function clearDiagConsole() {
   if (consoleEl) consoleEl.innerHTML = '';
 }
 
-async function verifyApiKey(provider, apiKey) {
+async function verifyApiKey(provider, apiKey, endpoint = '', model = '') {
   const cleanKey = String(apiKey || '').trim();
-  if (!cleanKey) {
+  const isCustomLocal = provider === 'custom' && (endpoint.includes('localhost') || endpoint.includes('127.0.0.1'));
+  if (!cleanKey && !isCustomLocal) {
     throw new Error('Vui lòng nhập khóa API Key trước khi kiểm tra.');
   }
 
+  // 1. Google Gemini
   if (provider === 'gemini') {
-    // 1. Kiểm tra xác thực khóa thông qua endpoint danh sách models của Google AI Studio
     const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${cleanKey}`, {
       method: 'GET',
       headers: { 'Content-Type': 'application/json' }
@@ -52,40 +54,114 @@ async function verifyApiKey(provider, apiKey) {
       const errData = await res.json().catch(() => null);
       const rawMsg = errData?.error?.message || `Mã HTTP ${res.status}`;
       if (rawMsg.toLowerCase().includes('api key not valid') || rawMsg.toLowerCase().includes('api_key_invalid')) {
-        throw new Error('Khóa API không hợp lệ hoặc đã bị vô hiệu hóa. Hãy lấy key mới tại aistudio.google.com');
+        throw new Error('Khóa API không hợp lệ hoặc đã bị vô hiệu hóa.');
       }
-      if (rawMsg.toLowerCase().includes('expired')) {
-        throw new Error('Khóa API đã hết hạn sử dụng. Hãy tạo key mới tại aistudio.google.com');
-      }
-      throw new Error(`Google từ chối xác thực: ${rawMsg}`);
+      throw new Error(`Google từ chối: ${rawMsg}`);
     }
 
     const data = await res.json().catch(() => ({}));
-    if (Array.isArray(data.models)) {
-      return `Hợp lệ (Đã kết nối Google Gemini với ${data.models.length} mô hình khả dụng)`;
-    }
-    return 'Hợp lệ và sẵn sàng hoạt động';
+    const count = Array.isArray(data.models) ? ` (${data.models.length} models)` : '';
+    return `Google Gemini hoạt động tốt${count}`;
   }
 
-  // OpenAI verification
-  const res = await fetch('https://api.openai.com/v1/models', {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${cleanKey}`
+  // 2. OpenAI
+  if (provider === 'openai') {
+    const res = await fetch('https://api.openai.com/v1/models', {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${cleanKey}`
+      }
+    });
+
+    if (!res.ok) {
+      const errData = await res.json().catch(() => null);
+      throw new Error(`OpenAI từ chối: ${errData?.error?.message || `HTTP ${res.status}`}`);
     }
+    return 'OpenAI API hoạt động tốt!';
+  }
+
+  // 3. DeepSeek
+  if (provider === 'deepseek') {
+    const res = await fetch('https://api.deepseek.com/models', {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${cleanKey}`
+      }
+    });
+
+    if (!res.ok) {
+      const errData = await res.json().catch(() => null);
+      throw new Error(`DeepSeek từ chối: ${errData?.error?.message || `HTTP ${res.status}`}`);
+    }
+    return 'DeepSeek API hoạt động tốt!';
+  }
+
+  // 4. OpenRouter
+  if (provider === 'openrouter') {
+    const res = await fetch('https://openrouter.ai/api/v1/auth/key', {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${cleanKey}`
+      }
+    });
+
+    if (!res.ok) {
+      const errData = await res.json().catch(() => null);
+      throw new Error(`OpenRouter từ chối: ${errData?.error?.message || `HTTP ${res.status}`}`);
+    }
+    const data = await res.json().catch(() => ({}));
+    const limit = data?.data?.limit != null ? ` (Limit: $${data.data.limit})` : '';
+    return `OpenRouter API hoạt động tốt!${limit}`;
+  }
+
+  // 5. Groq Cloud
+  if (provider === 'groq') {
+    const res = await fetch('https://api.groq.com/openai/v1/models', {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${cleanKey}`
+      }
+    });
+
+    if (!res.ok) {
+      const errData = await res.json().catch(() => null);
+      throw new Error(`Groq từ chối: ${errData?.error?.message || `HTTP ${res.status}`}`);
+    }
+    return 'Groq Cloud API hoạt động tốt!';
+  }
+
+  // 6. Custom OpenAI-compatible endpoint
+  let testUrl = endpoint.trim();
+  if (!testUrl) {
+    throw new Error('Vui lòng nhập Endpoint URL cho AI tùy chỉnh.');
+  }
+  if (!testUrl.includes('/chat/completions') && !testUrl.includes('/generateContent')) {
+    testUrl = testUrl.replace(/\/+$/, '') + '/chat/completions';
+  }
+
+  const headers = { 'Content-Type': 'application/json' };
+  if (cleanKey) headers['Authorization'] = `Bearer ${cleanKey}`;
+
+  const res = await fetch(testUrl, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      model: model.trim() || 'default',
+      messages: [{ role: 'user', content: 'ping' }],
+      max_tokens: 5
+    })
   });
 
   if (!res.ok) {
     const errData = await res.json().catch(() => null);
-    const rawMsg = errData?.error?.message || `Mã HTTP ${res.status}`;
-    if (res.status === 401) {
-      throw new Error('Khóa API OpenAI không chính xác hoặc đã hết hạn.');
-    }
-    throw new Error(`OpenAI từ chối xác thực: ${rawMsg}`);
+    throw new Error(`Endpoint trả về HTTP ${res.status}: ${errData?.error?.message || errData?.message || res.statusText}`);
   }
 
-  return 'Hợp lệ và sẵn sàng hoạt động';
+  return 'Kết nối thành công tới Endpoint tùy chỉnh!';
 }
 
 async function runTestAll() {
@@ -222,6 +298,39 @@ async function init() {
 
   $('llmProvider').value = config.llmProvider || 'gemini';
   $('llmApiKey').value = config.llmApiKey || '';
+  $('llmEndpoint').value = config.llmEndpoint || '';
+  $('llmModel').value = config.llmModel || '';
+
+  const updateProviderFields = (provider) => {
+    const preset = PROVIDER_PRESETS[provider] || PROVIDER_PRESETS.custom;
+    const endpointBlock = $('llmEndpointBlock');
+    const modelBlock = $('llmModelBlock');
+    const hintEl = $('llmProviderHint');
+
+    if (provider === 'custom') {
+      endpointBlock.style.display = 'block';
+      modelBlock.style.display = 'block';
+      $('llmEndpoint').placeholder = 'https://api.your-domain.com/v1/chat/completions';
+      $('llmModel').placeholder = 'Ví dụ: claude-3-7-sonnet, deepseek-chat, gpt-4o';
+      hintEl.textContent = 'Hỗ trợ chuẩn OpenAI-compatible (Ollama, Together, Groq, vLLM, reverse proxy...)';
+    } else if (provider === 'openrouter') {
+      endpointBlock.style.display = 'none';
+      modelBlock.style.display = 'block';
+      $('llmModel').placeholder = 'Ví dụ: anthropic/claude-3.5-sonnet, deepseek/deepseek-r1';
+      hintEl.textContent = preset.hint;
+    } else {
+      endpointBlock.style.display = 'none';
+      modelBlock.style.display = 'none';
+      hintEl.textContent = preset.hint;
+    }
+  };
+
+  updateProviderFields($('llmProvider').value);
+
+  // Lắng nghe thay đổi nhà cung cấp AI
+  $('llmProvider').onchange = e => {
+    updateProviderFields(e.target.value);
+  };
 
   // Lắng nghe thanh trượt
   $('depth').oninput = e => $('depthOut').value = e.target.value;
@@ -278,17 +387,21 @@ async function init() {
   // 3. Nút "Chạy Kiểm Tra Toàn Bộ (Test All)"
   $('testAllBtn').onclick = () => runTestAll();
 
-  // 4. Nút "Lưu API Key"
+  // 4. Nút "Lưu Cấu Hình AI"
   $('saveApiKeyBtn').onclick = async () => {
     const provider = $('llmProvider').value;
     const apiKey = $('llmApiKey').value.trim();
+    const endpoint = $('llmEndpoint').value.trim();
+    const model = $('llmModel').value.trim();
 
     await setConfig({
       llmProvider: provider,
-      llmApiKey: apiKey
+      llmApiKey: apiKey,
+      llmEndpoint: endpoint,
+      llmModel: model
     });
 
-    setStatus('apiKeyStatus', '[LƯU THÀNH CÔNG] ĐÃ LƯU KHÓA API VÀO TRÌNH DUYỆT');
+    setStatus('apiKeyStatus', '[LƯU THÀNH CÔNG] ĐÃ LƯU CẤU HÌNH AI VÀO TRÌNH DUYỆT');
     setTimeout(() => setStatus('apiKeyStatus', ''), 2500);
   };
 
@@ -296,17 +409,21 @@ async function init() {
   $('testApiKeyBtn').onclick = async () => {
     const provider = $('llmProvider').value;
     const apiKey = $('llmApiKey').value.trim();
+    const endpoint = $('llmEndpoint').value.trim();
+    const model = $('llmModel').value.trim();
 
-    if (!apiKey) {
+    const isCustomLocal = provider === 'custom' && (endpoint.includes('localhost') || endpoint.includes('127.0.0.1'));
+    if (!apiKey && !isCustomLocal) {
       setStatus('apiKeyStatus', '[CẢNH BÁO] Vui lòng nhập khóa API Key trước khi kiểm tra.', true);
       return;
     }
 
-    setStatus('apiKeyStatus', `[KIỂM TRA] Đang kết nối tới ${provider === 'gemini' ? 'Google Gemini' : 'OpenAI'}...`);
+    const providerName = PROVIDER_PRESETS[provider]?.name || provider.toUpperCase();
+    setStatus('apiKeyStatus', `[KIỂM TRA] Đang kết nối tới ${providerName}...`);
 
     try {
-      const resultMessage = await verifyApiKey(provider, apiKey);
-      setStatus('apiKeyStatus', `[THÀNH CÔNG] Khóa API ${provider.toUpperCase()}: ${resultMessage}`);
+      const resultMessage = await verifyApiKey(provider, apiKey, endpoint, model);
+      setStatus('apiKeyStatus', `[THÀNH CÔNG] ${resultMessage}`);
     } catch (err) {
       setStatus('apiKeyStatus', `[THẤT BẠI] ${err.message}`, true);
     }

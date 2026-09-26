@@ -1146,8 +1146,10 @@ export class ChatHUD {
             move: this.lastBestMove,
             evaluation: this.lastEvaluation,
             userColor: this.sideOverride || this.userColor,
-            provider: this.config.llmProvider || 'openai',
-            apiKey: this.config.llmApiKey
+            provider: this.config.llmProvider || 'gemini',
+            apiKey: this.config.llmApiKey,
+            endpoint: this.config.llmEndpoint || '',
+            model: this.config.llmModel || ''
           });
           resultBox.textContent = explanation;
         } catch (err) {
