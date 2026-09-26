@@ -13,6 +13,7 @@ export class EngineManager {
     this.currentCandidates = new Map();
     this.currentAnalyzingFen = null;
     this.currentAnalyzingColor = 'w';
+    this.forceLocalWorker = false;
   }
 
   isContentScript() {
@@ -47,7 +48,7 @@ export class EngineManager {
   }
 
   async init() {
-    if (this.isContentScript()) return;
+    if (this.isContentScript() && !this.forceLocalWorker) return;
     if (this.ready && this.worker) return;
 
     try {
@@ -168,47 +169,63 @@ export class EngineManager {
     const targetDepth = Math.max(5, (config.depth ?? 16) + modeCfg.depthBonus);
     const targetMovetime = Math.round((config.movetime ?? 1600) * modeCfg.movetimeMultiplier);
 
-    // If running in a webpage context (content script), delegate to extension background/offscreen
-    if (this.isContentScript()) {
+    // If running in a webpage context (content script), try background offscreen first
+    if (this.isContentScript() && !this.forceLocalWorker) {
       this.stop();
-      return new Promise((resolve, reject) => {
-        let isCancelled = false;
-        this.contentScriptPending = {
-          resolve,
-          reject,
-          cancel: () => {
-            isCancelled = true;
-            reject(new Error('Cancelled'));
-          }
-        };
+      try {
+        const bgResult = await new Promise((resolve, reject) => {
+          let isCancelled = false;
+          this.contentScriptPending = {
+            resolve,
+            reject,
+            cancel: () => {
+              isCancelled = true;
+              reject(new Error('Cancelled'));
+            }
+          };
 
-        chrome.runtime.sendMessage(
-          {
-            type: 'ANALYZE_POSITION',
-            fen,
-            config: {
-              skillLevel: config.skillLevel ?? 20,
-              depth: targetDepth,
-              movetime: targetMovetime,
-              thinkingMode: modeKey
+          chrome.runtime.sendMessage(
+            {
+              type: 'ANALYZE_POSITION',
+              fen,
+              config: {
+                skillLevel: config.skillLevel ?? 20,
+                depth: targetDepth,
+                movetime: targetMovetime,
+                thinkingMode: modeKey
+              }
+            },
+            response => {
+              if (isCancelled) return;
+              this.contentScriptPending = null;
+              if (chrome.runtime.lastError) {
+                return reject(new Error(chrome.runtime.lastError.message));
+              }
+              if (!response || !response.success) {
+                return reject(new Error(response?.error || 'Engine calculation failed'));
+              }
+              resolve(response.result);
             }
-          },
-          response => {
-            if (isCancelled) return;
-            this.contentScriptPending = null;
-            if (chrome.runtime.lastError) {
-              return reject(new Error(chrome.runtime.lastError.message));
-            }
-            if (!response || !response.success) {
-              return reject(new Error(response?.error || 'Engine calculation failed'));
-            }
-            resolve(response.result);
-          }
-        );
-      });
+          );
+        });
+        return bgResult;
+      } catch (err) {
+        if (
+          err.message?.includes('offscreen') ||
+          err.message?.includes('OFFSCREEN') ||
+          err.message?.includes('undefined is not an object') ||
+          err.message?.includes('Could not establish connection')
+        ) {
+          logger.info('[ChessMate] Background offscreen unavailable (Mobile/Orion). Switching to local Web Worker engine!');
+          this.forceLocalWorker = true;
+          // Fall through to local Stockfish worker below!
+        } else {
+          throw err;
+        }
+      }
     }
 
-    // Offscreen context: run Stockfish directly
+    // Direct / Local worker context: run Stockfish directly
     if (!fen || typeof fen !== 'string' || fen.split(' ').length < 2) {
       throw new Error('Invalid FEN provided for analysis');
     }

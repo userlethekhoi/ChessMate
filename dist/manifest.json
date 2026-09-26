@@ -24,7 +24,7 @@
   "content_scripts": [
     {
       "js": [
-        "assets/content.js-loader-lLo9269h.js"
+        "assets/content.js-loader-CcPVP-u-.js"
       ],
       "matches": [
         "https://www.chess.com/*",
@@ -44,8 +44,8 @@
         "assets/stockfish-DDdgjDOu.js",
         "assets/llm-client-CDOB8dke.js",
         "assets/board-evaluator-BmEPwPFI.js",
-        "assets/engine-manager-BGgj0ZFd.js",
-        "assets/content.js-DmP5xO0X.js"
+        "assets/engine-manager-CgUSWR5X.js",
+        "assets/content.js-BZQB4s_p.js"
       ],
       "use_dynamic_url": false
     }

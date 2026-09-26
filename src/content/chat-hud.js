@@ -28,6 +28,7 @@ export class ChatHUD {
     this.isMyTurn = true;
     this.sideOverride = null; // null = auto, 'w' = White, 'b' = Black
     this.otaInfo = null;
+    this.isCompact = typeof window !== 'undefined' && window.innerWidth <= 640;
 
     this.init();
   }
@@ -89,6 +90,97 @@ export class ChatHUD {
 
       #chessmate-hud-root.hidden {
         display: none;
+      }
+
+      /* Compact Mini Bar Mode (Non-obstructive dock) */
+      #chessmate-hud-root.compact {
+        height: 44px !important;
+        max-height: 44px !important;
+        overflow: hidden !important;
+        background: rgba(10, 12, 16, 0.96) !important;
+        backdrop-filter: blur(14px) !important;
+        border: 1px solid #e59b2c !important;
+        border-radius: 6px !important;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.75) !important;
+        padding: 0 !important;
+      }
+
+      #chessmate-hud-root.compact .cm-hud-header,
+      #chessmate-hud-root.compact .cm-hud-tabs,
+      #chessmate-hud-root.compact .cm-hud-body,
+      #chessmate-hud-root.compact .cm-hud-footer {
+        display: none !important;
+      }
+
+      #chessmate-hud-root.compact .cm-mini-bar {
+        display: flex !important;
+      }
+
+      .cm-mini-bar {
+        display: none;
+        align-items: center;
+        justify-content: space-between;
+        width: 100%;
+        height: 44px;
+        padding: 0 10px;
+        box-sizing: border-box;
+      }
+
+      .cm-mini-info {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        overflow: hidden;
+        flex: 1;
+        cursor: pointer;
+      }
+
+      .cm-mini-badge {
+        background: #e59b2c;
+        color: #0c0e12;
+        font-size: 10px;
+        font-weight: 800;
+        padding: 3px 6px;
+        border-radius: 2px;
+        letter-spacing: 0.5px;
+        flex-shrink: 0;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+
+      .cm-mini-move {
+        font-size: 12px;
+        font-weight: 700;
+        color: #ffffff;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .cm-mini-actions {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        flex-shrink: 0;
+      }
+
+      .cm-btn-compact-expand {
+        background: #1e222a;
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        color: #e59b2c;
+        padding: 4px 8px;
+        border-radius: 2px;
+        font-size: 10px;
+        font-weight: 800;
+        cursor: pointer;
+        transition: background 0.15s, color 0.15s;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+
+      .cm-btn-compact-expand:hover {
+        background: #e59b2c;
+        color: #0c0e12;
       }
 
       /* Bubble button when minimized (Icon-free) */
@@ -732,10 +824,26 @@ export class ChatHUD {
   createWindow() {
     this.root = document.createElement('div');
     this.root.id = 'chessmate-hud-root';
+    if (this.isCompact) {
+      this.root.classList.add('compact');
+    }
     this.root.innerHTML = `
+      <!-- Mini Dock Bar (38px non-obstructive bar for mobile) -->
+      <div class="cm-mini-bar" id="cm-mini-bar">
+        <div class="cm-mini-info" id="cm-mini-info" title="Chạm để mở rộng bảng phân tích chi tiết">
+          <span class="cm-mini-badge" id="cm-mini-badge">CHESSMATE</span>
+          <span class="cm-mini-move" id="cm-mini-move">Đang chờ lượt đi...</span>
+        </div>
+        <div class="cm-mini-actions">
+          <button class="cm-btn-compact-expand" id="cm-btn-mini-expand" title="Mở rộng HUD">▲ MỞ</button>
+          <button class="cm-btn-ctl" id="cm-btn-mini-bubble" title="Thu thành bong bóng">[-]</button>
+        </div>
+      </div>
+
       <div class="cm-hud-header" id="cm-drag-handle">
         <div class="cm-hud-title">CHESSMATE - CỬA SỔ PHÂN TÍCH</div>
         <div class="cm-hud-controls">
+          <button class="cm-btn-ctl" id="cm-btn-compact" title="Thu gọn thành thanh mini (không che màn hình)">[▼]</button>
           <button class="cm-btn-ctl" id="cm-btn-min" title="Thu nhỏ">[-]</button>
           <button class="cm-btn-ctl close" id="cm-btn-close" title="Tắt hẳn">[X]</button>
         </div>
@@ -767,6 +875,25 @@ export class ChatHUD {
     document.body.append(this.root);
 
     // Event listeners
+    this.root.querySelector('#cm-btn-compact').onclick = (e) => {
+      e.stopPropagation();
+      this.compact();
+    };
+
+    this.root.querySelector('#cm-btn-mini-expand').onclick = (e) => {
+      e.stopPropagation();
+      this.expand();
+    };
+
+    this.root.querySelector('#cm-mini-info').onclick = () => {
+      this.expand();
+    };
+
+    this.root.querySelector('#cm-btn-mini-bubble').onclick = (e) => {
+      e.stopPropagation();
+      this.minimize();
+    };
+
     this.root.querySelector('#cm-btn-min').onclick = (e) => {
       e.stopPropagation();
       this.minimize();
@@ -796,6 +923,29 @@ export class ChatHUD {
       this.onReanalyze?.();
     };
 
+    this.renderBody();
+  }
+
+  compact() {
+    this.isCompact = true;
+    this.root.classList.add('compact');
+    if (window.innerWidth <= 640) {
+      this.root.style.top = 'auto';
+      this.root.style.bottom = '8px';
+      this.root.style.left = '8px';
+      this.root.style.right = '8px';
+    }
+  }
+
+  expand() {
+    this.isCompact = false;
+    this.root.classList.remove('compact');
+    if (window.innerWidth <= 640) {
+      this.root.style.top = 'auto';
+      this.root.style.bottom = '8px';
+      this.root.style.left = '8px';
+      this.root.style.right = '8px';
+    }
     this.renderBody();
   }
 
@@ -893,6 +1043,20 @@ export class ChatHUD {
     }
 
     this.renderBody();
+
+    // Update mini dock bar in real-time
+    const miniBadge = this.root.querySelector('#cm-mini-badge');
+    const miniMove = this.root.querySelector('#cm-mini-move');
+    if (miniBadge && miniMove) {
+      const activeSide = this.sideOverride || this.userColor;
+      if (this.isMyTurn) {
+        miniBadge.textContent = `${activeSide === 'w' ? '⚪' : '⚫'} ${uci.toUpperCase()}`;
+        miniMove.textContent = `${translation.short || translation.title} (${evalText})`;
+      } else {
+        miniBadge.textContent = `⏳ ĐỢI ĐỊCH`;
+        miniMove.textContent = `Dự đoán: ${translation.short || translation.title}`;
+      }
+    }
 
     // Update bubble title
     const bubbleText = this.bubble?.querySelector('#cm-bubble-text');
@@ -1289,11 +1453,11 @@ export class ChatHUD {
         const dx = moveTouch.clientX - startX;
         const dy = moveTouch.clientY - startY;
 
-        // If swiping down more than 100px from the handle, smoothly minimize HUD
-        if (dy > 100 && Math.abs(dx) < 60) {
+        // If swiping down more than 60px from the handle, smoothly collapse into compact Mini Bar
+        if (dy > 60 && Math.abs(dx) < 60) {
           isDragging = false;
           cleanupTouch();
-          this.minimize();
+          this.compact();
           return;
         }
 

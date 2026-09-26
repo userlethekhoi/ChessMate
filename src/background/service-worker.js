@@ -1,6 +1,11 @@
 let creatingOffscreenPromise = null;
 
 async function ensureOffscreen() {
+  if (typeof chrome.offscreen === 'undefined') {
+    // Orion Browser on iOS / Safari does not implement chrome.offscreen
+    return;
+  }
+
   if (chrome.offscreen?.hasDocument) {
     const hasDoc = await chrome.offscreen.hasDocument();
     if (hasDoc) return;
@@ -65,6 +70,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'ANALYZE_POSITION') {
     (async () => {
       try {
+        if (typeof chrome.offscreen === 'undefined') {
+          sendResponse({ success: false, fallbackToLocal: true, error: 'CHROME_OFFSCREEN_UNSUPPORTED' });
+          return;
+        }
         await ensureOffscreen();
         const response = await chrome.runtime.sendMessage({
           target: 'offscreen',
@@ -75,7 +84,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse(response);
       } catch (err) {
         console.info('[ChessMate SW] Analysis routing notice:', err?.message || err);
-        sendResponse({ success: false, error: err.message || String(err) });
+        sendResponse({ success: false, fallbackToLocal: true, error: err.message || String(err) });
       }
     })();
     return true;
