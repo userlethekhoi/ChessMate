@@ -247,8 +247,11 @@ export class EngineManager {
       if (frame._isReady) {
         sendReq();
       } else {
-        frame.addEventListener('load', sendReq, { once: true });
-        setTimeout(sendReq, 100);
+        frame.addEventListener('load', () => {
+          frame._isReady = true;
+          sendReq();
+        }, { once: true });
+        setTimeout(sendReq, 250);
       }
 
       setTimeout(() => {
@@ -267,7 +270,7 @@ export class EngineManager {
     const targetMovetime = Math.round((config.movetime ?? 1600) * modeCfg.movetimeMultiplier);
 
     // If running in a webpage context (content script), try background offscreen or extension iframe
-    if (this.isContentScript() && !this.forceLocalWorker) {
+    if (this.isContentScript()) {
       this.stop();
       try {
         const bgResult = await new Promise((resolve, reject) => {
@@ -309,13 +312,9 @@ export class EngineManager {
       } catch (err) {
         if (err.message === 'Cancelled') throw err;
         logger.info('[ChessMate] Background route notice:', err?.message || err, '- Trying extension iframe fallback');
-        try {
-          return await this.analyzeViaIframe(fen, config, targetDepth, targetMovetime, modeKey);
-        } catch (iframeErr) {
-          if (iframeErr?.message === 'Cancelled') throw iframeErr;
-          logger.info('[ChessMate] Iframe route notice:', iframeErr?.message, '- Switching to local worker fallback');
-          this.forceLocalWorker = true;
-        }
+        // ALWAYS use analyzeViaIframe in content script on mobile / WebKit.
+        // NEVER attempt new Worker() in content script because WebKit throws 'SecurityError: The operation is insecure'
+        return await this.analyzeViaIframe(fen, config, targetDepth, targetMovetime, modeKey);
       }
     }
 

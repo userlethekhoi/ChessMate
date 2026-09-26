@@ -18,6 +18,40 @@ if (fs.existsSync(zipPath)) {
   fs.unlinkSync(zipPath);
 }
 
+// 1. Ensure dist/manifest.json declares "assets/*" in web_accessible_resources
+const distManifestPath = path.join(distDir, 'manifest.json');
+if (fs.existsSync(distManifestPath)) {
+  try {
+    const m = JSON.parse(fs.readFileSync(distManifestPath, 'utf8'));
+    if (Array.isArray(m.web_accessible_resources)) {
+      for (const entry of m.web_accessible_resources) {
+        if (Array.isArray(entry.resources)) {
+          if (!entry.resources.includes('assets/*')) {
+            entry.resources.push('assets/*');
+          }
+        }
+      }
+    }
+    fs.writeFileSync(distManifestPath, JSON.stringify(m, null, 2), 'utf8');
+    console.log('✔ Đã xác thực assets/* trong web_accessible_resources');
+  } catch (err) {
+    console.warn('Cảnh báo khi sửa dist/manifest.json:', err.message);
+  }
+}
+
+// 2. Strip "crossorigin" from dist/src/offscreen/offscreen.html to prevent WebKit SecurityError
+const offscreenHtmlPath = path.join(distDir, 'src', 'offscreen', 'offscreen.html');
+if (fs.existsSync(offscreenHtmlPath)) {
+  try {
+    let html = fs.readFileSync(offscreenHtmlPath, 'utf8');
+    html = html.replace(/\scrossorigin(="[^"]*")?/g, '');
+    fs.writeFileSync(offscreenHtmlPath, html, 'utf8');
+    console.log('✔ Đã loại bỏ thuộc tính crossorigin trong offscreen.html');
+  } catch (err) {
+    console.warn('Cảnh báo khi sửa offscreen.html:', err.message);
+  }
+}
+
 const psScript = `
 Add-Type -AssemblyName System.IO.Compression;
 Add-Type -AssemblyName System.IO.Compression.FileSystem;
