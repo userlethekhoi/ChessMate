@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "ChessMate Agent",
   "version": "0.1.0",
-  "update_url": "https://raw.githubusercontent.com/userlethekhoi/Extension-Chess.Com/main/updates.xml",
+  "update_url": "https://raw.githubusercontent.com/userlethekhoi/ChessMate/main/updates.xml",
   "description": "Event-driven chess analysis assistant for practice and bot games.",
   "permissions": [
     "storage",
@@ -24,7 +24,7 @@
   "content_scripts": [
     {
       "js": [
-        "assets/content.js-loader-KH24Mkq3.js"
+        "assets/content.js-loader-lLo9269h.js"
       ],
       "matches": [
         "https://www.chess.com/*",
@@ -45,7 +45,7 @@
         "assets/llm-client-CDOB8dke.js",
         "assets/board-evaluator-BmEPwPFI.js",
         "assets/engine-manager-BGgj0ZFd.js",
-        "assets/content.js-hoLYQU0c.js"
+        "assets/content.js-DmP5xO0X.js"
       ],
       "use_dynamic_url": false
     }

@@ -2,7 +2,7 @@
  * OTA Updater - Module kiểm tra và thông báo cập nhật Online tự động cho ChessMate AI
  */
 
-const DEFAULT_UPDATE_URL = 'https://raw.githubusercontent.com/userlethekhoi/Extension-Chess.Com/main/version.json';
+const DEFAULT_UPDATE_URL = 'https://raw.githubusercontent.com/userlethekhoi/ChessMate/main/version.json';
 
 /**
  * So sánh 2 chuỗi version ngữ nghĩa (semver: "0.1.0" vs "0.2.0")
