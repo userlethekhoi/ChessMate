@@ -55,21 +55,33 @@ export class BoardObserver {
     if (!this.board) return;
     this.stop();
     this.observer = new MutationObserver(mutations => {
-      if (!this.board || !mutations.some(m => this.board.contains(m.target))) return;
       clearTimeout(this.timer);
-      // 250ms: đủ để animation quân cờ chess.com (~200ms) hoàn tất trước khi đọc FEN
-      this.timer = setTimeout(() => this.check(), 250);
+      // 220ms: đủ để animation quân cờ chess.com (~200ms) hoàn tất trước khi đọc FEN
+      this.timer = setTimeout(() => this.check(), 220);
     });
 
-    this.observer.observe(this.board, {
+    const obsConfig = {
       childList: true,
       subtree: true,
       attributes: true,
-      attributeFilter: ['class', 'style']
-    });
+      attributeFilter: ['class', 'style', 'data-square', 'data-piece', 'data-fen']
+    };
+
+    try {
+      this.observer.observe(this.board, obsConfig);
+      if (this.board.shadowRoot) {
+        this.observer.observe(this.board.shadowRoot, obsConfig);
+      }
+    } catch (_) {}
+
+    // Polling heartbeat (650ms): ensures touch moves and mobile re-renders are never missed
+    clearInterval(this.pollInterval);
+    this.pollInterval = setInterval(() => {
+      this.check();
+    }, 650);
 
     // Trigger immediate analysis on start
-    setTimeout(() => this.check(true), 200);
+    setTimeout(() => this.check(true), 150);
   }
 
   check(force = false) {
@@ -103,6 +115,8 @@ export class BoardObserver {
   stop() {
     this.observer?.disconnect();
     clearTimeout(this.timer);
+    clearInterval(this.pollInterval);
+    this.pollInterval = null;
     this.observer = null;
   }
 }

@@ -243,18 +243,24 @@ export class ChatHUD {
 
       .cm-btn-ctl {
         background: #1e222a;
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        color: #808893;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        color: #cbd5e1;
         width: 28px;
-        height: 24px;
-        border-radius: 2px;
-        display: flex;
+        min-width: 28px;
+        height: 26px;
+        border-radius: 4px;
+        display: inline-flex;
         align-items: center;
         justify-content: center;
         cursor: pointer;
-        font-size: 10px;
+        font-size: 14px;
         font-weight: 700;
-        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        line-height: 1;
+        padding: 0;
+        white-space: nowrap !important;
+        overflow: hidden;
+        flex-shrink: 0;
+        user-select: none;
         transition: background 0.15s, color 0.15s;
       }
 
@@ -828,24 +834,24 @@ export class ChatHUD {
       this.root.classList.add('compact');
     }
     this.root.innerHTML = `
-      <!-- Mini Dock Bar (38px non-obstructive bar for mobile) -->
+      <!-- Mini Dock Bar (44px non-obstructive bar for mobile) -->
       <div class="cm-mini-bar" id="cm-mini-bar">
         <div class="cm-mini-info" id="cm-mini-info" title="Chạm để mở rộng bảng phân tích chi tiết">
           <span class="cm-mini-badge" id="cm-mini-badge">CHESSMATE</span>
           <span class="cm-mini-move" id="cm-mini-move">Đang chờ lượt đi...</span>
         </div>
         <div class="cm-mini-actions">
-          <button class="cm-btn-compact-expand" id="cm-btn-mini-expand" title="Mở rộng HUD">▲ MỞ</button>
-          <button class="cm-btn-ctl" id="cm-btn-mini-bubble" title="Thu thành bong bóng">[-]</button>
+          <button class="cm-btn-compact-expand" id="cm-btn-mini-expand" title="Mở rộng HUD">▲ Mở</button>
+          <button class="cm-btn-ctl" id="cm-btn-mini-bubble" title="Thu thành bong bóng">-</button>
         </div>
       </div>
 
       <div class="cm-hud-header" id="cm-drag-handle">
         <div class="cm-hud-title">CHESSMATE - CỬA SỔ PHÂN TÍCH</div>
         <div class="cm-hud-controls">
-          <button class="cm-btn-ctl" id="cm-btn-compact" title="Thu gọn thành thanh mini (không che màn hình)">[▼]</button>
-          <button class="cm-btn-ctl" id="cm-btn-min" title="Thu nhỏ">[-]</button>
-          <button class="cm-btn-ctl close" id="cm-btn-close" title="Tắt hẳn">[X]</button>
+          <button class="cm-btn-ctl" id="cm-btn-compact" title="Thu gọn thành thanh mini (không che màn hình)">▼</button>
+          <button class="cm-btn-ctl" id="cm-btn-min" title="Thu nhỏ">-</button>
+          <button class="cm-btn-ctl close" id="cm-btn-close" title="Tắt hẳn">✕</button>
         </div>
       </div>
 
@@ -988,6 +994,21 @@ export class ChatHUD {
     if (el) el.textContent = text;
     const bubbleText = this.bubble?.querySelector('#cm-bubble-text');
     if (bubbleText) bubbleText.textContent = text;
+
+    // Keep mini dock bar in sync so mobile users always see current status
+    const miniBadge = this.root?.querySelector('#cm-mini-badge');
+    const miniMove = this.root?.querySelector('#cm-mini-move');
+    if (miniMove) {
+      if (analyzing) {
+        if (miniBadge) miniBadge.textContent = '⏳ TÍNH TOÁN';
+        miniMove.textContent = text || 'Đang suy nghĩ nước cờ...';
+      } else if (text?.startsWith('Engine: ') || text?.startsWith('Quét: ') || text?.startsWith('Lỗi')) {
+        if (miniBadge) miniBadge.textContent = '⚠️ LỖI';
+        miniMove.textContent = text;
+      } else if (!this.lastBestMove) {
+        miniMove.textContent = text;
+      }
+    }
   }
 
   reset() {

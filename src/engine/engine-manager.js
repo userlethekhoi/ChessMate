@@ -163,13 +163,99 @@ export class EngineManager {
     }
   }
 
+  ensureEngineIframe() {
+    if (typeof document === 'undefined') return null;
+    let frame = document.getElementById('chessmate-engine-frame');
+    if (!frame) {
+      frame = document.createElement('iframe');
+      frame.id = 'chessmate-engine-frame';
+      frame.src = globalThis.chrome?.runtime?.getURL?.('src/offscreen/offscreen.html') || '';
+      frame.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:none;opacity:0;pointer-events:none;z-index:-1;';
+      (document.body || document.documentElement).appendChild(frame);
+    }
+    return frame;
+  }
+
+  analyzeViaIframe(fen, config, targetDepth, targetMovetime, modeKey) {
+    const frame = this.ensureEngineIframe();
+    if (!frame) return Promise.reject(new Error('IFrame unavailable'));
+
+    return new Promise((resolve, reject) => {
+      const reqId = 'cm_' + Math.random().toString(36).slice(2, 9);
+      let isSettled = false;
+
+      const onMessage = (event) => {
+        if (event.data?.target !== 'chessmate_content' || event.data?.id !== reqId) return;
+        isSettled = true;
+        window.removeEventListener('message', onMessage);
+        this.contentScriptPending = null;
+        if (event.data.success) {
+          resolve(event.data.result);
+        } else {
+          reject(new Error(event.data.error || 'IFrame analysis failed'));
+        }
+      };
+
+      this.contentScriptPending = {
+        resolve,
+        reject,
+        cancel: () => {
+          isSettled = true;
+          window.removeEventListener('message', onMessage);
+          try {
+            frame.contentWindow?.postMessage({ target: 'offscreen', type: 'OFFSCREEN_STOP' }, '*');
+          } catch (_) {}
+          reject(new Error('Cancelled'));
+        }
+      };
+
+      window.addEventListener('message', onMessage);
+
+      const sendReq = () => {
+        try {
+          frame.contentWindow?.postMessage({
+            target: 'offscreen',
+            type: 'OFFSCREEN_ANALYZE',
+            id: reqId,
+            fen,
+            config: {
+              skillLevel: config.skillLevel ?? 20,
+              depth: targetDepth,
+              movetime: targetMovetime,
+              thinkingMode: modeKey
+            }
+          }, '*');
+        } catch (e) {
+          if (!isSettled) {
+            window.removeEventListener('message', onMessage);
+            reject(e);
+          }
+        }
+      };
+
+      if (frame.contentDocument?.readyState === 'complete') {
+        sendReq();
+      } else {
+        frame.addEventListener('load', sendReq, { once: true });
+        setTimeout(sendReq, 80);
+      }
+
+      setTimeout(() => {
+        if (!isSettled) {
+          window.removeEventListener('message', onMessage);
+          reject(new Error('IFrame engine calculation timeout'));
+        }
+      }, targetMovetime + 5000);
+    });
+  }
+
   async getBestMove(fen, config = {}) {
     const modeKey = config.thinkingMode || 'mate_hunt';
     const modeCfg = getModeConfig(modeKey);
     const targetDepth = Math.max(5, (config.depth ?? 16) + modeCfg.depthBonus);
     const targetMovetime = Math.round((config.movetime ?? 1600) * modeCfg.movetimeMultiplier);
 
-    // If running in a webpage context (content script), try background offscreen first
+    // If running in a webpage context (content script), try background offscreen or extension iframe
     if (this.isContentScript() && !this.forceLocalWorker) {
       this.stop();
       try {
@@ -210,17 +296,14 @@ export class EngineManager {
         });
         return bgResult;
       } catch (err) {
-        if (
-          err.message?.includes('offscreen') ||
-          err.message?.includes('OFFSCREEN') ||
-          err.message?.includes('undefined is not an object') ||
-          err.message?.includes('Could not establish connection')
-        ) {
-          logger.info('[ChessMate] Background offscreen unavailable (Mobile/Orion). Switching to local Web Worker engine!');
+        if (err.message === 'Cancelled') throw err;
+        logger.info('[ChessMate] Background route notice:', err?.message || err, '- Trying extension iframe fallback');
+        try {
+          return await this.analyzeViaIframe(fen, config, targetDepth, targetMovetime, modeKey);
+        } catch (iframeErr) {
+          if (iframeErr?.message === 'Cancelled') throw iframeErr;
+          logger.info('[ChessMate] Iframe route notice:', iframeErr?.message, '- Switching to local worker fallback');
           this.forceLocalWorker = true;
-          // Fall through to local Stockfish worker below!
-        } else {
-          throw err;
         }
       }
     }
@@ -280,8 +363,12 @@ export class EngineManager {
         this.contentScriptPending.cancel?.();
         this.contentScriptPending = null;
       }
+      try {
+        const frame = document.getElementById('chessmate-engine-frame');
+        frame?.contentWindow?.postMessage({ target: 'offscreen', type: 'OFFSCREEN_STOP' }, '*');
+      } catch (_) {}
       chrome.runtime?.sendMessage?.({ type: 'STOP_ANALYSIS' })?.catch?.(() => {});
-      return;
+      if (!this.forceLocalWorker) return;
     }
 
     if (this.isSearching && this.worker) {

@@ -70,11 +70,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'ANALYZE_POSITION') {
     (async () => {
       try {
-        if (typeof chrome.offscreen === 'undefined') {
-          sendResponse({ success: false, fallbackToLocal: true, error: 'CHROME_OFFSCREEN_UNSUPPORTED' });
-          return;
+        if (typeof chrome.offscreen !== 'undefined') {
+          await ensureOffscreen();
         }
-        await ensureOffscreen();
         const response = await chrome.runtime.sendMessage({
           target: 'offscreen',
           type: 'OFFSCREEN_ANALYZE',

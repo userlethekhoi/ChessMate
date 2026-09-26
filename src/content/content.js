@@ -165,6 +165,11 @@ async function boot() {
       analyzeCurrentState();
     }
   });
+  // Pre-warm engine iframe runner for mobile / Safari / Orion support
+  try {
+    engine.ensureEngineIframe();
+  } catch (_) {}
+
   chatHud.updateConfig(config);
 
   let unsubscribeMove = null;
