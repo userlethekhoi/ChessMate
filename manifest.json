@@ -1,21 +1,61 @@
 {
   "manifest_version": 3,
   "name": "ChessMate Agent",
-  "version": "0.1.0",
-  "update_url": "https://raw.githubusercontent.com/userlethekhoi/ChessMate/main/updates.xml",
+  "version": "0.1.1",
   "description": "Event-driven chess analysis assistant for practice and bot games.",
-  "permissions": ["storage", "activeTab", "scripting", "offscreen"],
+  "permissions": [
+    "storage",
+    "activeTab",
+    "scripting",
+    "offscreen"
+  ],
   "host_permissions": [
     "*://*/*"
   ],
-  "action": { "default_title": "ChessMate Agent", "default_popup": "src/popup/popup.html" },
-  "background": { "service_worker": "src/background/service-worker.js", "type": "module" },
-  "content_scripts": [{
-    "matches": ["https://www.chess.com/*", "https://chess.com/*"],
-    "js": ["src/content/content.js"],
-    "run_at": "document_idle"
-  }],
-  "web_accessible_resources": [{ "resources": ["src/engine/*", "src/offscreen/*"], "matches": ["https://www.chess.com/*", "https://chess.com/*"] }],
-  "content_security_policy": { "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'" },
-  "icons": {}
+  "action": {
+    "default_title": "ChessMate Agent",
+    "default_popup": "src/popup/popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "background": {
+    "service_worker": "src/background/service-worker.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.chess.com/*",
+        "https://chess.com/*"
+      ],
+      "js": [
+        "src/content/content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "src/engine/*",
+        "src/offscreen/*",
+        "icons/*"
+      ],
+      "matches": [
+        "https://www.chess.com/*",
+        "https://chess.com/*"
+      ]
+    }
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
 }

@@ -1,8 +1,7 @@
 {
   "manifest_version": 3,
   "name": "ChessMate Agent",
-  "version": "0.1.0",
-  "update_url": "https://raw.githubusercontent.com/userlethekhoi/ChessMate/main/updates.xml",
+  "version": "0.1.1",
   "description": "Event-driven chess analysis assistant for practice and bot games.",
   "permissions": [
     "storage",
@@ -15,7 +14,12 @@
   ],
   "action": {
     "default_title": "ChessMate Agent",
-    "default_popup": "src/popup/popup.html"
+    "default_popup": "src/popup/popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
   },
   "background": {
     "service_worker": "service-worker-loader.js",
@@ -42,6 +46,7 @@
       "resources": [
         "src/engine/*",
         "src/offscreen/*",
+        "icons/*",
         "assets/stockfish-DDdgjDOu.js",
         "assets/llm-client-C5wotM8n.js",
         "assets/board-evaluator-Cqia6-8m.js",
@@ -54,5 +59,9 @@
   "content_security_policy": {
     "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
   },
-  "icons": {}
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
 }
