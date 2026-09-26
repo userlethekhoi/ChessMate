@@ -3,6 +3,16 @@
  */
 
 export const THINKING_MODES = {
+  fastest_win: {
+    id: 'fastest_win',
+    name: 'Đường Đi Ngắn Nhất (Shortest & Direct Path)',
+    badge: 'Tối Ưu Bước',
+    depthBonus: 3,
+    movetimeMultiplier: 1.35,
+    contempt: 80,
+    description: 'Ưu tiên nước đi ít bước nhất, dứt điểm nhanh nhất. Triệt hạ mục tiêu trực diện và phòng thủ 1 bước chuẩn xác.',
+    evalNote: (evalScore) => evalScore >= 900 ? 'Chiếu hết với số bước ít nhất' : 'Lộ trình dứt điểm ngắn nhất'
+  },
   mate_hunt: {
     id: 'mate_hunt',
     name: 'Săn Chiếu Hết (Mate Hunter)',

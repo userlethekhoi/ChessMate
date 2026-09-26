@@ -57,7 +57,8 @@ export class BoardObserver {
     this.observer = new MutationObserver(mutations => {
       if (!this.board || !mutations.some(m => this.board.contains(m.target))) return;
       clearTimeout(this.timer);
-      this.timer = setTimeout(() => this.check(), 120);
+      // 250ms: đủ để animation quân cờ chess.com (~200ms) hoàn tất trước khi đọc FEN
+      this.timer = setTimeout(() => this.check(), 250);
     });
 
     this.observer.observe(this.board, {
@@ -79,12 +80,24 @@ export class BoardObserver {
 
     const previous = this.lastFEN;
     this.lastFEN = fen;
+
+    // Detect game restart to initial position
+    const START_POS = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR';
+    if (fen.startsWith(START_POS) && previous && !previous.startsWith(START_POS)) {
+      this.emit('new-game', { fen, reason: 'start_position_reset' });
+    }
+
     this.emit('move-detected', { fen, previous, board: this.board });
     this.emit('turn-changed', fen.split(' ')[1]);
   }
 
   forceCheck() {
     this.check(true);
+  }
+
+  reset() {
+    this.lastFEN = null;
+    clearTimeout(this.timer);
   }
 
   stop() {

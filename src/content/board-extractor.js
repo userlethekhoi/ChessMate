@@ -3,6 +3,13 @@ import { boardToPlacement, isValidFen } from '../utils/chess-utils.js';
 import { logger } from '../utils/logger.js';
 
 export let lastDiagnostic = '';
+let _prevPlacement = null;  // dùng để so sánh phát hiện en passant
+
+export function resetExtractorState() {
+  _prevPlacement = null;
+  lastDiagnostic = '';
+}
+
 
 const PIECE_MAP = { king: 'k', queen: 'q', rook: 'r', bishop: 'b', knight: 'n', horse: 'n', pawn: 'p' };
 
@@ -50,29 +57,69 @@ export function readPieceFromSquare(el) {
   return parsePieceText(`${rawCls} ${dataPiece} ${ariaLabel}`, el);
 }
 
+export function hasValidBoardPieces(el) {
+  if (!el || typeof el.getBoundingClientRect !== 'function') return false;
+  const r = el.getBoundingClientRect();
+  if (r.width < 140 || r.height < 140) return false;
+
+  // A chessboard MUST be approximately square (tolerance: aspect ratio 0.85 to 1.18)
+  // This strictly rejects outer layout containers (e.g. .board-layout-main, sidebars, page wrappers)
+  const ratio = r.width / r.height;
+  if (ratio < 0.85 || ratio > 1.18) return false;
+
+  const searchRoots = [el];
+  if (el.shadowRoot) searchRoots.push(el.shadowRoot);
+  let pieceCount = 0;
+  for (const root of searchRoots) {
+    const pieces = root.querySelectorAll?.('.piece, [class*="piece"], [data-piece]');
+    if (pieces) pieceCount += pieces.length;
+  }
+  return pieceCount >= 2;
+}
+
 export function findBoardElement(root = document) {
   // 1. Direct standard custom elements (strictly prioritizing the actual chessboard)
-  const wc = root.querySelector('wc-chess-board, chess-board');
-  if (wc && wc.getBoundingClientRect().width > 120) return wc;
+  const wc = root.querySelector('wc-chess-board, chess-board, #board-single');
+  if (wc && hasValidBoardPieces(wc)) return wc;
 
   for (const selector of BOARD_SELECTORS) {
     const el = root.querySelector(selector);
-    if (el && el.getBoundingClientRect().width > 120) return el;
+    if (el && hasValidBoardPieces(el)) return el;
   }
 
-  // 2. Discover board from any piece element
-  const piece = root.querySelector('.piece, [class*="piece"], [data-piece]');
-  if (piece) {
-    const candidate = piece.closest('wc-chess-board, chess-board, .board, [id*="board"], [class*="board"]') || piece.parentElement;
-    if (candidate && candidate.getBoundingClientRect().width > 120) return candidate;
+  // 2. Discover board from piece elements (only if at least 2 pieces exist)
+  const pieces = root.querySelectorAll?.('.piece, [class*="piece"], [data-piece]') || [];
+  if (pieces.length >= 2) {
+    for (const piece of pieces) {
+      const candidate = piece.closest?.('wc-chess-board, chess-board, #board-single, .board, [id*="board"], [class*="board"]') || piece.parentElement;
+      if (candidate && hasValidBoardPieces(candidate)) {
+        // If candidate contains a standard inner board, prefer the innermost board
+        const inner = candidate.querySelector?.('wc-chess-board, chess-board, #board-single, .board');
+        if (inner && inner !== candidate && hasValidBoardPieces(inner)) return inner;
+        return candidate;
+      }
+    }
   }
 
-  // 3. Fallback: inspect any square-sized board candidate
-  const candidates = root.querySelectorAll('[id*="board"], [class*="board"], [class*="chessboard"]');
-  for (const b of candidates) {
-    const r = b.getBoundingClientRect();
-    if (r.width > 180 && r.height > 180 && Math.abs(r.width - r.height) < 50) {
-      return b;
+  // 3. Fallback: inspect any square-sized board candidate with pieces, preferring innermost (smallest area)
+  const candidates = Array.from(root.querySelectorAll?.('wc-chess-board, chess-board, #board-single, .board, [id*="board"], [class*="board"], [class*="chessboard"]') || [])
+    .filter(b => hasValidBoardPieces(b));
+
+  if (candidates.length > 0) {
+    candidates.sort((a, b) => {
+      const ra = a.getBoundingClientRect();
+      const rb = b.getBoundingClientRect();
+      return (ra.width * ra.height) - (rb.width * rb.height);
+    });
+    return candidates[0];
+  }
+
+  // If no populated board is found yet, check if wc-chess-board is still initializing (0 pieces during setup)
+  if (wc) {
+    const r = wc.getBoundingClientRect();
+    if (r.width > 140 && r.height > 140) {
+      const ratio = r.width / r.height;
+      if (ratio >= 0.85 && ratio <= 1.18) return wc;
     }
   }
 
@@ -91,6 +138,7 @@ function isPieceAlive(piece) {
   const cls = String(piece.getAttribute?.('class') || piece.className || '').toLowerCase();
   if (cls.includes('captured') || cls.includes('ghost') || cls.includes('dragging-source')) return false;
   if (piece.style?.display === 'none' || piece.style?.visibility === 'hidden') return false;
+  if (piece.style?.opacity === '0' || piece.getAttribute('style')?.includes('opacity: 0')) return false;
   return true;
 }
 
@@ -139,36 +187,174 @@ function getSquareIndices(piece, rect, flipped) {
   return null;
 }
 
-function collectAllElements(container = document) {
-  const elements = new Set();
-  const queue = [container];
-  const seen = new Set();
+export function getPieceOnSquare(board, square) {
+  if (!board || !square || square.length < 2) return null;
+  const fileChar = square[0].toLowerCase();
+  const fileNum = 'abcdefgh'.indexOf(fileChar) + 1;
+  const rankNum = parseInt(square[1], 10);
+  if (fileNum < 1 || fileNum > 8 || rankNum < 1 || rankNum > 8) return null;
 
-  while (queue.length > 0) {
-    const node = queue.shift();
-    if (!node || seen.has(node)) continue;
-    seen.add(node);
+  const selectors = [
+    `.piece.square-${fileNum}${rankNum}`,
+    `.piece.square-0${fileNum}0${rankNum}`,
+    `.piece.square-${fileChar}${rankNum}`,
+    `[class*="piece"][class*="square-${fileNum}${rankNum}"]`,
+    `[class*="piece"][class*="square-${fileChar}${rankNum}"]`,
+    `[class*="square-${fileNum}${rankNum}"]`,
+    `[class*="square-${fileChar}${rankNum}"]`,
+    `[data-square="${fileChar}${rankNum}"]`,
+    `[data-square="${fileNum}${rankNum}"]`
+  ];
 
-    if (node instanceof Element) {
-      elements.add(node);
-      if (node.shadowRoot && !seen.has(node.shadowRoot)) {
-        queue.push(node.shadowRoot);
-      }
-    }
+  const searchRoots = [board];
+  if (board.shadowRoot) searchRoots.push(board.shadowRoot);
 
-    if (node.children) {
-      for (let i = 0; i < node.children.length; i++) {
-        queue.push(node.children[i]);
+  for (const root of searchRoots) {
+    for (const sel of selectors) {
+      const el = root.querySelector?.(sel);
+      if (el && isPieceAlive(el)) {
+        return el;
       }
     }
   }
 
-  // Also gather from any wc-chess-board or chess-board anywhere in document
-  document.querySelectorAll('wc-chess-board, chess-board, .board, #board-single').forEach(b => {
-    if (!seen.has(b)) queue.push(b);
-    if (b.shadowRoot && !seen.has(b.shadowRoot)) queue.push(b.shadowRoot);
-  });
+  // Fallback: check all pieces inside board using getSquareIndices
+  const pieces = board.querySelectorAll?.('.piece, [class*="piece"], [data-piece]') || [];
+  const flipped = isBoardFlipped(board);
+  const rect = board.getBoundingClientRect();
+  for (const p of pieces) {
+    if (!isPieceAlive(p)) continue;
+    const indices = getSquareIndices(p, rect, flipped);
+    if (indices) {
+      const pFile = 'abcdefgh'[indices.fileIdx];
+      const pRank = 8 - indices.rankIdx;
+      if (pFile === fileChar && pRank === rankNum) {
+        return p;
+      }
+    }
+  }
 
+  return null;
+}
+
+export function getSquareCenter(board, square, srcCenter = null, srcSquare = null) {
+  if (!board || !square || square.length < 2) return null;
+  const fileChar = square[0].toLowerCase();
+  const fileNum = 'abcdefgh'.indexOf(fileChar) + 1;
+  const rankNum = parseInt(square[1], 10);
+  const flipped = isBoardFlipped(board);
+
+  // 1. Direct piece check: If there is a piece on this square (e.g. source piece or captured piece)
+  const piece = getPieceOnSquare(board, square);
+  if (piece) {
+    const pr = piece.getBoundingClientRect();
+    if (pr.width > 5 && pr.height > 5) {
+      return {
+        x: pr.left + pr.width / 2,
+        y: pr.top + pr.height / 2,
+        width: pr.width,
+        height: pr.height
+      };
+    }
+  }
+
+  // 2. Check if a dedicated square element exists (e.g. highlight or square element)
+  const squareEl = findSquare(board, rankNum, fileChar);
+  if (squareEl) {
+    const sr = squareEl.getBoundingClientRect();
+    if (sr.width > 5 && sr.height > 5) {
+      return {
+        x: sr.left + sr.width / 2,
+        y: sr.top + sr.height / 2,
+        width: sr.width,
+        height: sr.height
+      };
+    }
+  }
+
+  // 3. Intersection of other live pieces on the board (same file and same rank)
+  // This gives the exact physical grid alignments used by the website
+  const allPieces = board.querySelectorAll?.('.piece, [class*="piece"], [data-piece]') || [];
+  const bRect = board.getBoundingClientRect();
+  let fileX = null;
+  let rankY = null;
+  let squareW = srcCenter?.width || null;
+  let squareH = srcCenter?.height || null;
+
+  for (const p of allPieces) {
+    if (!isPieceAlive(p)) continue;
+    const indices = getSquareIndices(p, bRect, flipped);
+    if (!indices) continue;
+    const pr = p.getBoundingClientRect();
+    if (pr.width < 5 || pr.height < 5) continue;
+
+    squareW = squareW || pr.width;
+    squareH = squareH || pr.height;
+
+    const pFile = 'abcdefgh'[indices.fileIdx];
+    const pRank = 8 - indices.rankIdx;
+
+    if (pFile === fileChar && fileX === null) {
+      fileX = pr.left + pr.width / 2;
+    }
+    if (pRank === rankNum && rankY === null) {
+      rankY = pr.top + pr.height / 2;
+    }
+    if (fileX !== null && rankY !== null) break;
+  }
+
+  // 4. Projection from source piece (if available)
+  if ((fileX === null || rankY === null) && srcCenter && srcSquare) {
+    const srcFileNum = 'abcdefgh'.indexOf(srcSquare[0].toLowerCase()) + 1;
+    const srcRankNum = parseInt(srcSquare[1], 10);
+    const sqW = squareW || srcCenter.width || (bRect.width / 8);
+    const sqH = squareH || srcCenter.height || (bRect.height / 8);
+
+    const deltaCol = (fileNum - srcFileNum) * (flipped ? -1 : 1);
+    const deltaRow = (rankNum - srcRankNum) * (flipped ? 1 : -1);
+
+    if (fileX === null) fileX = srcCenter.x + deltaCol * sqW;
+    if (rankY === null) rankY = srcCenter.y + deltaRow * sqH;
+  }
+
+  // 5. Ultimate fallback: board bounding client rect geometry
+  const sqW = squareW || (bRect.width / 8);
+  const sqH = squareH || (bRect.height / 8);
+  const col = flipped ? (8 - fileNum) : (fileNum - 1);
+  const row = flipped ? (rankNum - 1) : (8 - rankNum);
+
+  return {
+    x: fileX !== null ? fileX : (bRect.left + (col + 0.5) * sqW),
+    y: rankY !== null ? rankY : (bRect.top + (row + 0.5) * sqH),
+    width: sqW,
+    height: sqH
+  };
+}
+
+function collectAllElements(container) {
+  if (!container) return [];
+  const elements = new Set();
+
+  // Fast path: query piece elements strictly from the active board container and its shadowRoot
+  const roots = [container];
+  if (container.shadowRoot) roots.push(container.shadowRoot);
+
+  const pieceSelector = '.piece, [class*="piece"], [data-piece]';
+  for (const root of roots) {
+    try {
+      if (root.querySelectorAll) {
+        root.querySelectorAll(pieceSelector).forEach(el => elements.add(el));
+      }
+    } catch (_) {}
+  }
+
+  if (elements.size >= 2) {
+    return Array.from(elements);
+  }
+
+  // Fallback: BFS traversal only if fast query didn't find pieces
+  const queue = [container];
+  const seen = new Set();
   while (queue.length > 0) {
     const node = queue.shift();
     if (!node || seen.has(node)) continue;
@@ -193,7 +379,7 @@ function collectAllElements(container = document) {
 
 function extractFromPieces(board) {
   const rect = board.getBoundingClientRect();
-  const flipped = board.classList.contains('flipped');
+  const flipped = isBoardFlipped(board);
   const candidates = collectAllElements(board);
 
   const rows = Array.from({ length: 8 }, () => Array(8).fill(null));
@@ -219,69 +405,252 @@ function extractFromPieces(board) {
   return pieceCount >= 2 ? boardToPlacement(rows) : null;
 }
 
-function detectTurn(board) {
-  // 1. Check highlights for the last move made
-  const highlights = board.querySelectorAll('.highlight, [class*="highlight"]');
-  if (highlights.length >= 2) {
-    for (const h of highlights) {
-      const cls = String(h.getAttribute('class') || h.className || '');
-      const match = cls.match(/square-0?([1-8])0?([1-8])/);
-      if (match) {
-        const rank = parseInt(match[2], 10);
-        // If a piece moved from/to rank 7 or 8, it's likely Black who moved -> now White's turn
-        if (rank >= 7) return 'w';
-        // If a piece moved from/to rank 1 or 2, it's likely White who moved -> now Black's turn
-        if (rank <= 2) return 'b';
+/**
+ * Checks if the board is visually flipped (Black pieces at bottom).
+ * Tries multiple attribute/class patterns used by chess.com as well as rendered coordinates.
+ */
+export function isBoardFlipped(board) {
+  if (!board) return false;
+
+  // 1. Common class names
+  if (board.classList.contains('flipped') ||
+      board.classList.contains('board-flipped') ||
+      board.classList.contains('reversed')) return true;
+
+  // 2. Data/HTML attributes (chess.com web component may use these)
+  const orientationAttr = board.getAttribute('data-orientation') ||
+                          board.getAttribute('orientation') ||
+                          board.getAttribute('board-orientation') ||
+                          board.getAttribute('flipped');
+  if (orientationAttr === 'black' || orientationAttr === '1' || orientationAttr === 'true') return true;
+  if (orientationAttr === 'white' || orientationAttr === '0' || orientationAttr === 'false') return false;
+
+  // 3. Parent element might carry the class
+  if (board.parentElement?.classList?.contains('flipped') ||
+      board.closest?.('[class*="flipped"]')) return true;
+
+  // 4. Physical coordinates check (rendered rank numbers: '1' at top or '8' at bottom = flipped)
+  const coords = board.querySelectorAll?.('.coordinate-light, .coordinate-dark, [class*="coordinate"], text.coordinate') || [];
+  for (const c of coords) {
+    const txt = (c.textContent || '').trim();
+    if (txt === '1' || txt === '8') {
+      const rect = c.getBoundingClientRect();
+      const bRect = board.getBoundingClientRect();
+      if (bRect.height > 0) {
+        const relY = (rect.top + rect.height / 2 - bRect.top) / bRect.height;
+        if (txt === '1' && relY < 0.35) return true;  // Rank 1 at top = Black perspective (flipped)
+        if (txt === '8' && relY > 0.65) return true;  // Rank 8 at bottom = Black perspective (flipped)
+        if (txt === '1' && relY > 0.65) return false; // Rank 1 at bottom = White perspective (normal)
+        if (txt === '8' && relY < 0.35) return false; // Rank 8 at top = White perspective (normal)
       }
     }
   }
 
-  // 2. Check clock highlighting
-  const flipped = board.classList.contains('flipped');
-  const bottomClockTurn = document.querySelector('.clock-bottom.clock-player-turn, .clock-player-turn.clock-bottom');
-  const topClockTurn = document.querySelector('.clock-top.clock-player-turn, .clock-player-turn.clock-top');
-
-  if (bottomClockTurn) return flipped ? 'b' : 'w';
-  if (topClockTurn) return flipped ? 'w' : 'b';
-
-  // 3. Check move list for last move
-  const moveNodes = document.querySelectorAll('.move-list-item, .move-node, [data-whole-move-number]');
-  if (moveNodes.length > 0) {
-    const lastNode = moveNodes[moveNodes.length - 1];
-    if (lastNode.classList.contains('black') || lastNode.closest('.black')) {
-      return 'w';
-    }
-    if (lastNode.classList.contains('white') || lastNode.closest('.white')) {
-      return 'b';
-    }
-  }
-
-  return 'w';
+  return false;
 }
 
-function getFenFromGame(board) {
-  const targets = [
-    board,
-    document.querySelector('wc-chess-board'),
-    document.querySelector('chess-board')
+/**
+ * Returns the color of the user based on board orientation.
+ * In Chess.com, the player at the bottom of the screen is ALWAYS the user.
+ */
+export function getUserColor(board = findBoardElement()) {
+  return isBoardFlipped(board) ? 'b' : 'w';
+}
+
+/**
+ * Checks which piece is standing on the destination square of the last move highlights.
+ * The piece standing on the destination square is ALWAYS the piece that just moved!
+ * If White piece moved -> now Black's turn ('b').
+ * If Black piece moved -> now White's turn ('w').
+ */
+function detectTurnFromHighlightPiece(board) {
+  const highlights = board.querySelectorAll('.highlight, [class*="highlight"]');
+  if (highlights.length < 2) return null;
+
+  const allPieces = board.querySelectorAll('.piece, [class*="piece"], [data-piece]');
+
+  for (const h of highlights) {
+    const cls = String(h.getAttribute('class') || h.className || '');
+    const m = cls.match(/square-0?([1-8])0?([1-8])/);
+    if (!m) continue;
+    const file = parseInt(m[1], 10);
+    const rank = parseInt(m[2], 10);
+    const sqClass = `square-${m[1]}${m[2]}`;
+
+    // Find any live piece on this highlighted square
+    for (const p of allPieces) {
+      if (!isPieceAlive(p)) continue;
+      const pCls = String(p.getAttribute('class') || p.className || '');
+      if (pCls.includes(sqClass)) {
+        const val = readPieceFromSquare(p);
+        if (val) {
+          const isWhite = val === val.toUpperCase();
+          const nextTurn = isWhite ? 'b' : 'w';
+          logger.info(`Turn detected from moved piece ${val} on ${sqClass} (${isWhite ? 'White' : 'Black'} moved) → turn=${nextTurn}`);
+          return nextTurn;
+        }
+      }
+    }
+
+    // Direct square element check fallback
+    const square = findSquare(board, rank, file);
+    if (square) {
+      const pieceVal = readPieceFromSquare(square);
+      if (pieceVal) {
+        const isWhite = pieceVal === pieceVal.toUpperCase();
+        const nextTurn = isWhite ? 'b' : 'w';
+        logger.info(`Turn detected from square element on ${file},${rank}: piece=${pieceVal} → turn=${nextTurn}`);
+        return nextTurn;
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Counts half-moves (plies) from the move list to determine turn.
+ */
+function detectTurnFromPlyCount() {
+  const nodeSelectors = [
+    'wc-move-list .node',
+    'wc-vertical-move-list .node',
+    '.node[data-node-index]',
+    '.vertical-move-list .node',
+    '.moves-list .node',
+    '.move-list .node',
+    '.move-list-v3 .node'
   ];
-  for (const t of targets) {
-    if (!t) continue;
+
+  for (const sel of nodeSelectors) {
     try {
-      if (typeof t.game?.getFEN === 'function') {
-        const f = t.game.getFEN();
-        if (isValidFen(f)) return f;
+      const rawNodes = document.querySelectorAll(sel);
+      if (rawNodes.length > 0) {
+        const moveNodes = Array.from(rawNodes).filter(n => {
+          const txt = (n.textContent || '').trim();
+          return !/^\d+\.?$/.test(txt);
+        });
+        if (moveNodes.length > 0) {
+          const last = moveNodes[moveNodes.length - 1];
+          if (last.classList.contains('white-node') || last.classList.contains('white')) return 'b';
+          if (last.classList.contains('black-node') || last.classList.contains('black')) return 'w';
+
+          const turn = moveNodes.length % 2 === 1 ? 'b' : 'w';
+          logger.info(`Turn via ply count: sel="${sel}" count=${moveNodes.length} → turn=${turn}`);
+          return turn;
+        }
       }
-      if (typeof t.getFEN === 'function') {
-        const f = t.getFEN();
-        if (isValidFen(f)) return f;
-      }
-      if (t.fen && isValidFen(t.fen)) return t.fen;
-      if (t.dataset?.fen && isValidFen(t.dataset.fen)) return t.dataset.fen;
     } catch (_) {}
   }
   return null;
 }
+
+function detectTurn(board) {
+  // --- Method 1: Check piece standing on last move highlight (MOST ACCURATE) ---
+  const highlightTurn = detectTurnFromHighlightPiece(board);
+  if (highlightTurn) return highlightTurn;
+
+  // --- Method 2: Ply count parity from move list ---
+  const plyTurn = detectTurnFromPlyCount();
+  if (plyTurn) return plyTurn;
+
+  // --- Method 3: Clock highlight ---
+  const flipped = isBoardFlipped(board);
+  const bottomClockTurn = document.querySelector(
+    '.clock-bottom.clock-player-turn, .clock-player-turn.clock-bottom, ' +
+    '[class*="clock"][class*="bottom"][class*="turn"], [class*="clock"][class*="bottom"][class*="running"]'
+  );
+  const topClockTurn = document.querySelector(
+    '.clock-top.clock-player-turn, .clock-player-turn.clock-top, ' +
+    '[class*="clock"][class*="top"][class*="turn"], [class*="clock"][class*="top"][class*="running"]'
+  );
+  if (bottomClockTurn) return flipped ? 'b' : 'w';
+  if (topClockTurn) return flipped ? 'w' : 'b';
+
+  return 'w'; // Default fallback (White moves first)
+}
+
+/**
+ * Infers castling rights from actual piece positions on the board.
+ * Prevents sending illegal castling flags to Stockfish (e.g. King on g1 but Q-right set).
+ */
+function inferCastlingRights(placement) {
+  const rows = placement.split('/');
+  if (rows.length !== 8) return '-';
+
+  function expandRank(s) {
+    const arr = [];
+    for (const c of s) {
+      if (/^[1-8]$/.test(c)) for (let i = 0; i < parseInt(c, 10); i++) arr.push(null);
+      else arr.push(c);
+    }
+    while (arr.length < 8) arr.push(null);
+    return arr;
+  }
+
+  const r1 = expandRank(rows[7] || '');  // rank 1 = White's back rank
+  const r8 = expandRank(rows[0] || '');  // rank 8 = Black's back rank
+
+  let castling = '';
+  // White: King must be on e1 (index 4)
+  if (r1[4] === 'K') {
+    if (r1[7] === 'R') castling += 'K';  // Rook on h1 → kingside
+    if (r1[0] === 'R') castling += 'Q';  // Rook on a1 → queenside
+  }
+  // Black: King must be on e8 (index 4)
+  if (r8[4] === 'k') {
+    if (r8[7] === 'r') castling += 'k';  // Rook on h8 → kingside
+    if (r8[0] === 'r') castling += 'q';  // Rook on a8 → queenside
+  }
+
+  return castling || '-';
+}
+
+/**
+ * Detects en passant target square by comparing previous and current placement.
+ * If a pawn moved from rank 2→4 (White) or 7→5 (Black), the EP square is the skipped rank.
+ */
+function inferEnPassant(prevPlacement, currPlacement, turn) {
+  if (!prevPlacement || !currPlacement || prevPlacement === currPlacement) return '-';
+
+  function expandBoard(placement) {
+    const board = [];
+    for (const rankStr of placement.split('/')) {
+      const row = [];
+      for (const c of rankStr) {
+        if (/^[1-8]$/.test(c)) for (let i = 0; i < parseInt(c, 10); i++) row.push(null);
+        else row.push(c);
+      }
+      board.push(row);
+    }
+    return board; // board[0] = rank8, board[7] = rank1
+  }
+
+  try {
+    const prev = expandBoard(prevPlacement);
+    const curr = expandBoard(currPlacement);
+    const FILES = 'abcdefgh';
+
+    if (turn === 'b') {
+      // White just moved: check if a White pawn went from rank2 (board[6]) to rank4 (board[4])
+      for (let col = 0; col < 8; col++) {
+        if (prev[6][col] === 'P' && curr[4][col] === 'P' && curr[6][col] === null) {
+          return `${FILES[col]}3`; // EP square is rank3 (the skipped square)
+        }
+      }
+    } else {
+      // Black just moved: check if a Black pawn went from rank7 (board[1]) to rank5 (board[3])
+      for (let col = 0; col < 8; col++) {
+        if (prev[1][col] === 'p' && curr[3][col] === 'p' && curr[1][col] === null) {
+          return `${FILES[col]}6`; // EP square is rank6 (the skipped square)
+        }
+      }
+    }
+  } catch (_) {}
+
+  return '-';
+}
+
 
 export function extractFEN(board = findBoardElement()) {
   if (!board) {
@@ -289,18 +658,10 @@ export function extractFEN(board = findBoardElement()) {
     return null;
   }
 
-  // 1. Direct game instance API (fastest, 100% accurate if available)
-  const apiFen = getFenFromGame(board);
-  if (apiFen) {
-    lastDiagnostic = 'OK (game API)';
-    logger.info('[ChessMate] Extracted FEN from game API:', apiFen);
-    return apiFen;
-  }
-
-  // 2. Extract from pieces (recursively scanning all shadow roots)
+  // 1. Extract directly from real DOM piece elements on the chessboard
   let placement = extractFromPieces(board);
 
-  // 3. Fallback: iterate over squares
+  // 2. Fallback: iterate over squares 8x8
   if (!placement) {
     const rows = [];
     let found = false;
@@ -316,16 +677,22 @@ export function extractFEN(board = findBoardElement()) {
     if (found) placement = boardToPlacement(rows);
   }
 
+
   if (!placement) {
-    logger.warn('[ChessMate] Could not extract board placement:', lastDiagnostic);
+    logger.info('Could not extract board placement:', lastDiagnostic);
     return null;
   }
 
   const turn = detectTurn(board);
-  const fen = `${placement} ${turn} KQkq - 0 1`;
+  const castling = inferCastlingRights(placement);
+  const epSquare = inferEnPassant(_prevPlacement, placement, turn);
+  _prevPlacement = placement;  // cập nhật cho lần tiếp
+  const fen = `${placement} ${turn} ${castling} ${epSquare} 0 1`;
+  logger.info(`FEN built: turn=${turn} castling=${castling} ep=${epSquare}`);
+
   if (!isValidFen(fen)) {
     lastDiagnostic = `Invalid FEN: ${fen.slice(0, 30)}...`;
-    logger.warn('[ChessMate] Board state could not be validated:', fen);
+    logger.info('Board state could not be validated:', fen);
     return null;
   }
   

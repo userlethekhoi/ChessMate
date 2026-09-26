@@ -54,7 +54,7 @@ export function translateMoveToVietnamese(uci, fen = null) {
 
   const fromSq = uci.slice(0, 2).toLowerCase();
   const toSq = uci.slice(2, 4).toLowerCase();
-  const promotion = uci[4]?.toLowerCase();
+  let promotion = uci[4]?.toLowerCase();
 
   const fromUpper = fromSq.toUpperCase();
   const toUpper = toSq.toUpperCase();
@@ -109,15 +109,43 @@ export function translateMoveToVietnamese(uci, fen = null) {
     }
   }
 
-  // 2. Phong cấp (Promotion)
+  // 2. Phong cấp (Promotion) - Xem xét kĩ các trường hợp Phong Hậu, Phong Mã, Phong Xe, Phong Tượng
+  if (!promotion && pieceType === 'p') {
+    if ((fromSq[1] === '7' && toSq[1] === '8') || (fromSq[1] === '2' && toSq[1] === '1')) {
+      promotion = 'q';
+    }
+  }
+
   if (promotion) {
-    const promoNames = { q: 'Hậu', r: 'Xe', b: 'Tượng', n: 'Mã' };
-    const promoName = promoNames[promotion] || 'Hậu';
+    const promoMap = {
+      q: { name: 'Hậu', symbol: '👑', desc: 'Tối ưu hóa sức mạnh áp đảo để dồn ép và kết liễu ván đấu nhanh nhất.' },
+      n: { name: 'Mã', symbol: '♞', desc: 'Độc chiêu Underpromotion! Tận dụng bước nhảy chữ L tạo đòn bắt đôi (Fork) hoặc chiếu bất ngờ, đồng thời tránh bẫy Pat hòa cờ.' },
+      r: { name: 'Xe', symbol: '♜', desc: 'Kỹ thuật Underpromotion! Tránh bẫy Pat (Stalemate hòa cờ nếu phong Hậu) và duy trì thế thắng ép góc tuyệt đối.' },
+      b: { name: 'Tượng', symbol: '♝', desc: 'Kỹ thuật Underpromotion tinh tế! Tránh hòa cờ và kiểm soát đường chéo chiến lược để bóp nghẹt đối thủ.' }
+    };
+    const promoInfo = promoMap[promotion] || promoMap.q;
+
+    if (targetPiece) {
+      const targetName = PIECE_NAMES_VI[targetPiece.toLowerCase()] || 'quân đối phương';
+      return {
+        title: `${pieceName} ở ô ${fromUpper} ăn ${targetName} tại ô ${toUpper} ➔ Phong ${promoInfo.name} ${promoInfo.symbol}`,
+        short: `${fromUpper}x${toUpper}=${promotion.toUpperCase()}`,
+        piece: pieceName,
+        promotion,
+        promoName: promoInfo.name,
+        promoSymbol: promoInfo.symbol,
+        desc: `Tiêu diệt ${targetName} đối phương tại ${toUpper} và phong ${promoInfo.name}. ${promoInfo.desc}`
+      };
+    }
+
     return {
-      title: `${pieceName} ở ô ${fromUpper} tiến lên ${toUpper} (Phong ${promoName})`,
-      short: `${pieceName} ${fromUpper} -> ${toUpper}=${promotion.toUpperCase()}`,
+      title: `${pieceName} ở ô ${fromUpper} tiến lên ô ${toUpper} ➔ Phong ${promoInfo.name} ${promoInfo.symbol}`,
+      short: `${fromUpper}->${toUpper}=${promotion.toUpperCase()}`,
       piece: pieceName,
-      desc: `Tiến Tốt xuống hàng cuối và phong cấp thành ${promoName} uy lực`
+      promotion,
+      promoName: promoInfo.name,
+      promoSymbol: promoInfo.symbol,
+      desc: `Tiến Tốt xuống hàng cuối và phong cấp thành ${promoInfo.name}. ${promoInfo.desc}`
     };
   }
 
@@ -166,25 +194,50 @@ export function translateMoveToVietnamese(uci, fen = null) {
 }
 
 /**
- * Formats evaluation score into readable, icon-free Vietnamese text
+ * Returns structured evaluation parts to prevent text clipping/overflow
  */
-export function formatEvaluationVi(evaluation) {
-  if (evaluation == null || isNaN(evaluation)) return 'Đang tính toán...';
+export function formatEvaluationParts(evaluation) {
+  if (evaluation == null) {
+    return { numeric: '...', desc: 'Đang phân tích', full: 'Đang tính toán...' };
+  }
+  if (typeof evaluation === 'string' && evaluation.startsWith('#')) {
+    const mateNum = parseInt(evaluation.replace('#', ''), 10);
+    const sign = mateNum >= 0 ? '+' : '-';
+    const mateLabel = isNaN(mateNum) ? '#M' : `M${Math.abs(mateNum)}`;
+    const sideWin = (isNaN(mateNum) || mateNum >= 0) ? 'Trắng' : 'Đen';
+    return {
+      numeric: `${sign}${mateLabel}`,
+      desc: `${sideWin} có đòn chiếu hết`,
+      full: `[CHIẾU HẾT] ${sideWin} chiếu hết trong ${Math.abs(mateNum || 1)} nước`
+    };
+  }
+  if (isNaN(evaluation)) {
+    return { numeric: '...', desc: 'Đang phân tích', full: 'Đang tính toán...' };
+  }
   if (evaluation >= 900) {
-    return '[CHIẾU HẾT] Trắng có đòn dứt điểm';
+    return { numeric: '+#M', desc: 'Trắng có đòn chiếu hết', full: '[CHIẾU HẾT] Trắng có đòn dứt điểm' };
   }
   if (evaluation <= -900) {
-    return '[CHIẾU HẾT] Đen có đòn dứt điểm';
+    return { numeric: '-#M', desc: 'Đen có đòn chiếu hết', full: '[CHIẾU HẾT] Đen có đòn dứt điểm' };
   }
   const score = Number(evaluation);
+  const sign = score > 0 ? '+' : '';
+  const numStr = `${sign}${score.toFixed(1)}`;
   if (Math.abs(score) < 0.25) {
-    return `Cân bằng (${score >= 0 ? '+' : ''}${score.toFixed(1)})`;
+    return { numeric: numStr, desc: 'Thế trận cân bằng', full: `Cân bằng (${numStr})` };
   }
   if (score > 0) {
     const level = score > 3 ? 'áp đảo' : score > 1.5 ? 'lớn' : 'nhẹ';
-    return `Trắng ưu thế ${level} (+${score.toFixed(2)})`;
+    return { numeric: numStr, desc: `Trắng ưu thế ${level}`, full: `Trắng ưu thế ${level} (+${score.toFixed(2)})` };
   }
   const absScore = Math.abs(score);
   const level = absScore > 3 ? 'áp đảo' : absScore > 1.5 ? 'lớn' : 'nhẹ';
-  return `Đen ưu thế ${level} (${score.toFixed(2)})`;
+  return { numeric: numStr, desc: `Đen ưu thế ${level}`, full: `Đen ưu thế ${level} (${score.toFixed(2)})` };
+}
+
+/**
+ * Formats evaluation score into readable, icon-free Vietnamese text
+ */
+export function formatEvaluationVi(evaluation) {
+  return formatEvaluationParts(evaluation).full;
 }

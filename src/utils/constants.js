@@ -1,9 +1,8 @@
 export const BOARD_SELECTORS = [
   'wc-chess-board',
   'chess-board',
-  '.board',
   '#board-single',
-  '.board-layout-chessboard',
+  '.board',
   '#chess_com_tactics_board'
 ];
 
@@ -17,10 +16,10 @@ export const SQUARE_SELECTORS = (rank, file) => {
   const r = Number(rank);
   const letter = typeof file === 'string' && isNaN(Number(file)) ? file.toLowerCase() : 'abcdefgh'[col - 1] || 'a';
   return [
-    `.square-${col}${r}`,
-    `.square-0${col}0${r}`,
-    `.square-${r}${letter}`,
-    `.square-${letter}${r}`
+    `.square-${col}${r}`,       // chess.com numeric: square-54 (file5 rank4)
+    `.square-0${col}0${r}`,     // padded numeric: square-0504
+    `.square-${letter}${r}`,   // alpha-rank: square-e4
+    `.square-${r}${letter}`    // rank-alpha fallback: square-4e
   ];
 };
 

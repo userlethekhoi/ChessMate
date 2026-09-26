@@ -2,6 +2,7 @@
   "manifest_version": 3,
   "name": "ChessMate Agent",
   "version": "0.1.0",
+  "update_url": "https://raw.githubusercontent.com/userlethekhoi/Extension-Chess.Com/main/updates.xml",
   "description": "Event-driven chess analysis assistant for practice and bot games.",
   "permissions": [
     "storage",
@@ -13,7 +14,9 @@
     "https://www.chess.com/*",
     "https://chess.com/*",
     "https://generativelanguage.googleapis.com/*",
-    "https://api.openai.com/*"
+    "https://api.openai.com/*",
+    "https://raw.githubusercontent.com/*",
+    "https://api.github.com/*"
   ],
   "action": {
     "default_title": "ChessMate Agent",
@@ -26,7 +29,7 @@
   "content_scripts": [
     {
       "js": [
-        "assets/content.js-loader-BknUP_Vd.js"
+        "assets/content.js-loader-DcmXcLcj.js"
       ],
       "matches": [
         "https://www.chess.com/*",
@@ -44,10 +47,10 @@
       "resources": [
         "src/engine/*",
         "assets/stockfish-DDdgjDOu.js",
-        "assets/config-manager-MOj5odmI.js",
-        "assets/thinking-modes-zB3v2kIJ.js",
-        "assets/engine-manager-Cq40Kxk2.js",
-        "assets/content.js-BjtE28h6.js"
+        "assets/config-manager-B2LfQHYM.js",
+        "assets/thinking-modes-MlZlJpKT.js",
+        "assets/engine-manager-C_sYJ1ET.js",
+        "assets/content.js-CRW1zmAY.js"
       ],
       "use_dynamic_url": false
     }

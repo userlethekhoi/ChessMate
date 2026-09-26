@@ -74,7 +74,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         });
         sendResponse(response);
       } catch (err) {
-        console.error('[ChessMate SW] Analysis routing error:', err);
+        console.info('[ChessMate SW] Analysis routing notice:', err?.message || err);
         sendResponse({ success: false, error: err.message || String(err) });
       }
     })();

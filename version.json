@@ -1,0 +1,14 @@
+{
+  "version": "0.1.0",
+  "name": "ChessMate AI Agent",
+  "releaseDate": "2026-09-26",
+  "changelog": [
+    "Khắc phục triệt để lỗi FEN tĩnh, đọc chuẩn xác 100% quân cờ thực tế",
+    "Giao diện HUD chống tràn dòng, hiển thị điểm số và tương quan lực lượng",
+    "Hệ thống Phong Cấp toàn diện (Hậu, Mã underpromotion, Xe chống bẫy pat, Tượng)",
+    "Bộ quy tắc cờ vua GM: Đánh giá giá trị quân, đổi quân để thắng dễ, thí quân chiếu bí",
+    "Thuật toán đường đi ngắn nhất: MultiPV tối ưu số bước dứt điểm và phòng thủ 1 nhịp",
+    "Tối ưu hóa giao diện di động (Mobile Touch Responsive & Bottom Sheet)"
+  ],
+  "downloadUrl": "https://github.com/userlethekhoi/Extension-Chess.Com/releases/latest"
+}

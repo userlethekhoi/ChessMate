@@ -3,7 +3,7 @@ let fen = '';
 try {
   importScripts('./stockfish.js');
 } catch (e) {
-  console.warn('Failed to import stockfish.js in worker:', e);
+  console.info('[ChessMate Worker] Worker import notice:', e);
 }
 
 self.onmessage = ({ data }) => {

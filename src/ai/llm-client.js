@@ -1,8 +1,13 @@
 import { explanationPrompt } from './prompts.js';
+import { calculateMaterial, evaluateMoveStrategy } from '../utils/board-evaluator.js';
 
 const cache = new Map();
 
-export async function explainMove({ fen, move, provider = 'gemini', apiKey }) {
+export function clearLlmCache() {
+  cache.clear();
+}
+
+export async function explainMove({ fen, move, evaluation = 0, userColor = 'w', provider = 'gemini', apiKey }) {
   const cleanKey = String(apiKey || '').trim();
   if (!cleanKey) {
     throw new Error('Chưa cung cấp API Key. Hãy cấu hình trong menu tiện ích.');
@@ -12,6 +17,19 @@ export async function explainMove({ fen, move, provider = 'gemini', apiKey }) {
   if (cache.has(cacheKey)) {
     return cache.get(cacheKey);
   }
+
+  // Phân tích ngữ cảnh lực lượng và chiến lược đổi/thí/thủ
+  const mat = calculateMaterial(fen);
+  const strat = evaluateMoveStrategy({ fen, uci: move, evaluation, userColor });
+  
+  const materialInfo = mat 
+    ? `Trắng: ${mat.whiteScore}đ | Đen: ${mat.blackScore}đ (${mat.diffText})`
+    : 'Chưa xác định';
+  const strategyInfo = strat
+    ? `[${strat.badge}] - ${strat.advice}`
+    : 'Tối ưu nước cờ';
+
+  const promptText = explanationPrompt({ fen, move, materialInfo, strategyInfo });
 
   if (provider === 'gemini') {
     const models = ['gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-1.5-pro'];
@@ -25,7 +43,7 @@ export async function explainMove({ fen, move, provider = 'gemini', apiKey }) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             contents: [{
-              parts: [{ text: `Bạn là kiện tướng cờ vua. Hãy giải thích ngắn gọn bằng 2-3 câu tiếng Việt dễ hiểu vì sao nước cờ ${move} là tối ưu trong thế cờ này (FEN: ${fen}). Chỉ rõ lợi ích chiến thuật.` }]
+              parts: [{ text: promptText }]
             }]
           })
         });
@@ -35,10 +53,9 @@ export async function explainMove({ fen, move, provider = 'gemini', apiKey }) {
           const msg = errData?.error?.message || `HTTP ${res.status}`;
           lastError = new Error(`Lỗi Google Gemini (${model}): ${msg}`);
           if (res.status === 400 || res.status === 401 || res.status === 403) {
-            // Key invalid or unauthorized - stop retrying other models
             throw lastError;
           }
-          continue; // Try next model if 404
+          continue;
         }
 
         const json = await res.json();
@@ -69,9 +86,9 @@ export async function explainMove({ fen, move, provider = 'gemini', apiKey }) {
       model: 'gpt-4o-mini',
       messages: [{
         role: 'user',
-        content: `Bạn là kiện tướng cờ vua. Hãy giải thích ngắn gọn bằng 2-3 câu tiếng Việt dễ hiểu vì sao nước cờ ${move} là tối ưu trong thế cờ này (FEN: ${fen}). Chỉ rõ lợi ích chiến thuật.`
+        content: promptText
       }],
-      max_tokens: 150
+      max_tokens: 220
     })
   });
 

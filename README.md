@@ -1,6 +1,11 @@
 # ChessMate Core - Trợ Thủ Phân Tích Cờ Vua
 
-ChessMate Core là tiện ích mở rộng (Chrome Extension Manifest V3) hỗ trợ phân tích thế cờ, gợi ý nước đi tối ưu và hỗ trợ tập luyện cờ vua trên nền tảng Chess.com. Dự án sử dụng Vanilla JavaScript, Vite, CRXJS và tích hợp động cơ Stockfish 19 WebAssembly chạy cục bộ hoàn toàn trên máy người dùng.
+[![Download Extension ZIP](https://img.shields.io/badge/TẢI_VỀ_NGAY-chessmate--agent.zip-brightgreen?style=for-the-badge&logo=googlechrome)](https://github.com/userlethekhoi/Extension-Chess.Com/raw/main/chessmate-agent.zip)
+[![Release Version](https://img.shields.io/badge/Phiên_bản-v0.1.0-blue?style=for-the-badge)](https://github.com/userlethekhoi/Extension-Chess.Com/releases)
+
+> ⚡ **Link tải trực tiếp cho Máy tính & Điện thoại**: [👉 Bấm vào đây để tải `chessmate-agent.zip`](https://github.com/userlethekhoi/Extension-Chess.Com/raw/main/chessmate-agent.zip)
+>
+> 📱 **Hỗ trợ Điện thoại (Mobile)**: Cài đặt trực tiếp trên **Orion Browser** (iOS/iPhone) hoặc **Kiwi Browser / Lemur Browser** (Android).
 
 ---
 

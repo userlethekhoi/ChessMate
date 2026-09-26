@@ -1,10 +1,11 @@
 import { BoardObserver } from './board-observer.js';
-import { findBoardElement } from './board-extractor.js';
+import { findBoardElement, resetExtractorState, getUserColor } from './board-extractor.js';
 import { Overlay } from './overlay.js';
 import { ChatHUD } from './chat-hud.js';
 import { executeMove } from './move-executor.js';
 import { EngineManager } from '../engine/engine-manager.js';
 import { getConfig, onChange } from '../storage/config-manager.js';
+import { clearLlmCache } from '../ai/llm-client.js';
 import { logger } from '../utils/logger.js';
 
 const observer = new BoardObserver();
@@ -14,6 +15,22 @@ let overlay;
 let chatHud;
 let board;
 let isAnalyzing = false;
+let lastAnalyzedFEN = null;  // dedup: tránh phân tích cùng một FEN nhiều lần
+let nextPendingFEN = null;   // queue: FEN mới nhất cần phân tích nếu FEN đến khi đang tính
+let _analysisToken = 0;      // stale guard: hủy kết quả cũ nếu FEN thay đổi giữa chừng
+
+function startNewGameSession(reason = 'manual') {
+  logger.info(`[ChessMate] Starting new game session (${reason})`);
+  _analysisToken++;
+  engine.stop();
+  overlay?.clear();
+  lastAnalyzedFEN = null;
+  nextPendingFEN = null;
+  observer.reset();
+  resetExtractorState();
+  chatHud?.reset();
+  clearLlmCache();
+}
 
 async function waitForBoard(attempt = 0) {
   const el = findBoardElement();
@@ -30,18 +47,17 @@ async function analyzeCurrentState(forcedFen = null) {
     return;
   }
   if (document.visibilityState === 'hidden') return;
-  if (isAnalyzing) return;
 
   const fen = forcedFen || observer.getCurrentFEN();
   if (!fen) {
     const diag = observer.getLastDiagnostic() || 'Đang quét bàn cờ...';
-    logger.warn('Could not extract valid FEN:', diag);
+    logger.info('Waiting for valid FEN:', diag);
     chatHud?.status(diag, true);
 
     setTimeout(() => {
       if (config?.enabled && !isAnalyzing) {
         const retryFen = observer.getCurrentFEN();
-        if (retryFen) {
+        if (retryFen && retryFen !== lastAnalyzedFEN) {
           analyzeCurrentState(retryFen);
         } else {
           const finalDiag = observer.getLastDiagnostic() || 'Bấm quét lại bàn cờ';
@@ -52,8 +68,27 @@ async function analyzeCurrentState(forcedFen = null) {
     return;
   }
 
+  // Bỏ qua nếu FEN giống hệt lần phân tích trước (tránh lặp do animation/DOM noise)
+  if (!forcedFen && fen === lastAnalyzedFEN) {
+    logger.info('[ChessMate] FEN unchanged, skipping analysis.');
+    return;
+  }
+
+  // Nếu đang phân tích nước cũ mà nước đi mới đã xuất hiện: huỷ phân tích cũ và xếp hàng FEN mới
+  if (isAnalyzing) {
+    logger.info('[ChessMate] New move detected during active analysis. Aborting old for new FEN:', fen);
+    engine.stop();
+    nextPendingFEN = fen;
+    return;
+  }
+
   isAnalyzing = true;
+  lastAnalyzedFEN = fen;  // đánh dấu FEN này đang/đã được phân tích
+  const myToken = ++_analysisToken;  // stale guard token
   chatHud?.status('Đang suy nghĩ nước cờ...', true);
+
+  // Xoá arrow cũ ngay lập tức để tránh gây nhầm lẫn khi đợi kết quả mới
+  overlay?.clear();
 
   try {
     logger.info('Analyzing FEN:', fen, 'Mode:', config.thinkingMode);
@@ -64,29 +99,53 @@ async function analyzeCurrentState(forcedFen = null) {
       return;
     }
 
-    // Update Chat HUD with Vietnamese natural language instructions
+    // Stale guard: FEN đã thay đổi trong lúc Stockfish đang tính — bỏ kết quả này
+    if (myToken !== _analysisToken) {
+      logger.info('[ChessMate] Stale analysis result discarded (FEN changed).');
+      return;
+    }
+
+    const turn = fen.split(' ')[1] || 'w';
+    const effectiveUserColor = chatHud?.sideOverride || getUserColor(board);
+    const isMyTurn = (turn === effectiveUserColor);
+
+    // Update Chat HUD with side, turn context, and shortest path efficiency note
     chatHud?.updateAnalysis({
       fen,
       uci: best.move,
       evaluation: best.evaluation,
-      depth: config.depth
+      depth: config.depth,
+      userColor: effectiveUserColor,
+      isMyTurn,
+      efficiencyNote: best.efficiencyNote
     });
 
-    // Arrow overlay on board: only show if user wants arrows and has not disabled overlay
-    if (config.showArrows !== false && config.showOverlay !== false) {
+    // Arrow overlay on board:
+    // Only show green arrow when it is OUR turn!
+    // When it's opponent's turn, clear overlay so user is not told to play opponent's piece!
+    if (isMyTurn && config.showArrows !== false && config.showOverlay !== false) {
       overlay?.showArrow(best.move, best.evaluation, config.depth);
     } else {
       overlay?.clear();
     }
 
-    if (config.autoPlay) {
+    if (isMyTurn && config.autoPlay) {
       await executeMove(board, best.move, config);
     }
   } catch (e) {
+    if (e.message === 'Cancelled') {
+      logger.info('[ChessMate] Previous engine analysis cancelled for newer board position.');
+      return;
+    }
     logger.warn('Analysis error:', e);
     chatHud?.status('Engine: ' + (e.message || 'Lỗi'));
   } finally {
     isAnalyzing = false;
+    if (nextPendingFEN) {
+      const queued = nextPendingFEN;
+      nextPendingFEN = null;
+      analyzeCurrentState(queued);
+    }
   }
 }
 
@@ -97,6 +156,10 @@ async function boot() {
   // Initialize Chat HUD (Draggable, Minimizable, Unobtrusive)
   chatHud = new ChatHUD({
     onReanalyze: () => analyzeCurrentState(),
+    onNewGame: () => {
+      startNewGameSession('user_manual_button');
+      setTimeout(() => analyzeCurrentState(), 300);
+    },
     onModeChange: (mode) => {
       config.thinkingMode = mode;
       analyzeCurrentState();
@@ -104,15 +167,34 @@ async function boot() {
   });
   chatHud.updateConfig(config);
 
+  let unsubscribeMove = null;
+  let unsubscribeNewGame = null;
+
   const initBoard = (b) => {
-    if (!b || board === b) return;
+    if (!b) return;
+    if (board === b) return;
+
+    if (board) {
+      logger.info('[ChessMate] Cleaning up previous board session before attaching new board');
+      unsubscribeMove?.();
+      unsubscribeNewGame?.();
+      overlay?.destroy();
+      startNewGameSession('board_replaced');
+    }
+
     board = b;
     logger.info('Chess board successfully located:', board);
     overlay = new Overlay(board);
 
-    observer.on('move-detected', async ({ fen }) => {
+    unsubscribeMove = observer.on('move-detected', async ({ fen }) => {
       await analyzeCurrentState(fen);
     });
+
+    unsubscribeNewGame = observer.on('new-game', ({ reason }) => {
+      startNewGameSession(reason);
+      setTimeout(() => analyzeCurrentState(), 300);
+    });
+
     observer.start(board);
 
     if (config.enabled) {
@@ -126,7 +208,7 @@ async function boot() {
   if (initialBoard) {
     initBoard(initialBoard);
   } else {
-    logger.warn('Board not found immediately, observing DOM for board appearance...');
+    logger.info('Board not found immediately, observing DOM for board appearance...');
     const bodyObserver = new MutationObserver(() => {
       const found = findBoardElement();
       if (found) {
@@ -137,6 +219,24 @@ async function boot() {
     bodyObserver.observe(document.body, { childList: true, subtree: true });
   }
 
+  // Watch URL changes for new game sessions (SPA navigation on chess.com)
+  let lastUrl = window.location.href;
+  const checkUrl = () => {
+    if (window.location.href !== lastUrl) {
+      logger.info(`URL navigation detected from ${lastUrl} to ${window.location.href}`);
+      lastUrl = window.location.href;
+      startNewGameSession('url_change');
+      const b = findBoardElement();
+      if (b && b !== board) {
+        initBoard(b);
+      } else if (b) {
+        setTimeout(() => analyzeCurrentState(), 500);
+      }
+    }
+  };
+  setInterval(checkUrl, 1000);
+  window.addEventListener('popstate', checkUrl);
+
   onChange(next => {
     const wasDisabled = !config?.enabled;
     config = { ...config, ...next };
@@ -144,7 +244,9 @@ async function boot() {
 
     if (!config.enabled) {
       overlay?.clear();
+      lastAnalyzedFEN = null;  // reset khi tắt để khi bật lại sẽ phân tích mới
     } else if (wasDisabled && config.enabled) {
+      lastAnalyzedFEN = null;  // force re-analyze khi bật lại
       analyzeCurrentState();
     }
   });
@@ -152,6 +254,10 @@ async function boot() {
   chrome.runtime?.onMessage?.addListener((msg) => {
     if (msg?.type === 'reanalyze') {
       analyzeCurrentState();
+    }
+    if (msg?.type === 'new_game' || msg?.type === 'reset_session') {
+      startNewGameSession('runtime_message');
+      setTimeout(() => analyzeCurrentState(), 300);
     }
     if (msg?.type === 'show_hud') {
       chatHud?.show();

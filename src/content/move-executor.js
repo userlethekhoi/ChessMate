@@ -43,6 +43,30 @@ export async function executeMove(board, uci, { delayMin = 800, delayMax = 2500 
   await randomDelay(80, 160);
   dispatchMouse('click', endPos.x, endPos.y, board);
 
+  // 5. Handle Pawn Promotion popup if Chess.com dialog appears
+  if (parsed.promotion) {
+    const promoPiece = parsed.promotion.toLowerCase(); // 'q', 'n', 'r', 'b'
+    await randomDelay(150, 300);
+    const promoSelectors = [
+      `.promotion-piece.w${promoPiece}`,
+      `.promotion-piece.b${promoPiece}`,
+      `.promotion-piece.${promoPiece}`,
+      `[data-piece="w${promoPiece}"]`,
+      `[data-piece="b${promoPiece}"]`,
+      `[data-piece="${promoPiece}"]`,
+      `.promotion-window .${promoPiece}`,
+      `.promotion-menu .${promoPiece}`
+    ];
+    for (const sel of promoSelectors) {
+      const el = document.querySelector(sel);
+      if (el) {
+        const pRect = el.getBoundingClientRect();
+        dispatchMouse('click', pRect.left + pRect.width / 2, pRect.top + pRect.height / 2, el);
+        break;
+      }
+    }
+  }
+
   return true;
 }
 

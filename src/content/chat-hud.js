@@ -1,13 +1,16 @@
-import { translateMoveToVietnamese, formatEvaluationVi } from '../utils/chess-translator.js';
+import { translateMoveToVietnamese, formatEvaluationVi, formatEvaluationParts } from '../utils/chess-translator.js';
+import { calculateMaterial, evaluateMoveStrategy, PIECE_VALUES } from '../utils/board-evaluator.js';
+import { checkForUpdates } from '../utils/ota-updater.js';
 import { TACTICAL_LESSONS } from '../ai/chess-book.js';
 import { THINKING_MODES, getModeConfig } from '../engine/thinking-modes.js';
 import { setConfig } from '../storage/config-manager.js';
 import { explainMove } from '../ai/llm-client.js';
 
 export class ChatHUD {
-  constructor({ onReanalyze, onModeChange }) {
+  constructor({ onReanalyze, onModeChange, onNewGame }) {
     this.onReanalyze = onReanalyze;
     this.onModeChange = onModeChange;
+    this.onNewGame = onNewGame;
 
     this.root = null;
     this.bubble = null;
@@ -17,9 +20,14 @@ export class ChatHUD {
     this.currentFen = null;
     this.lastBestMove = null;
     this.lastEvaluation = 0;
-    this.activeMode = 'mate_hunt';
+    this.lastEfficiencyNote = null;
+    this.activeMode = 'fastest_win';
     this.config = {};
     this.isAnalyzing = false;
+    this.userColor = 'w';
+    this.isMyTurn = true;
+    this.sideOverride = null; // null = auto, 'w' = White, 'b' = Black
+    this.otaInfo = null;
 
     this.init();
   }
@@ -32,6 +40,14 @@ export class ChatHUD {
     this.createBubble();
     this.createWindow();
     this.attachDragEvents();
+
+    // Check for OTA updates asynchronously
+    checkForUpdates().then(info => {
+      if (info && info.hasUpdate) {
+        this.otaInfo = info;
+        this.renderBody();
+      }
+    }).catch(() => {});
   }
 
   createStyles() {
@@ -229,27 +245,177 @@ export class ChatHUD {
         display: flex;
         justify-content: space-between;
         align-items: center;
+        gap: 8px;
         border-bottom: 1px solid rgba(255, 255, 255, 0.05);
         padding-bottom: 6px;
       }
 
       .cm-tag {
         font-size: 10px;
-        font-weight: 700;
+        font-weight: 800;
         letter-spacing: 0.5px;
-        padding: 2px 6px;
+        padding: 3px 7px;
         border-radius: 2px;
         background: rgba(229, 155, 44, 0.12);
         color: #e59b2c;
         border: 1px solid rgba(229, 155, 44, 0.3);
         text-transform: uppercase;
+        white-space: nowrap;
+        flex-shrink: 0;
       }
 
-      .cm-eval {
+      .cm-eval-chip {
         font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
         font-size: 11px;
-        font-weight: 700;
+        font-weight: 800;
         color: #2dd4bf;
+        background: rgba(45, 212, 191, 0.12);
+        border: 1px solid rgba(45, 212, 191, 0.3);
+        padding: 2px 7px;
+        border-radius: 2px;
+        white-space: nowrap;
+        flex-shrink: 0;
+      }
+
+      .cm-eval-subrow {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 11px;
+        color: #94a3b8;
+        line-height: 1.35;
+        margin-top: -2px;
+      }
+
+      .cm-eval-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: #2dd4bf;
+        display: inline-block;
+        flex-shrink: 0;
+      }
+
+      /* Promotion Advice Box */
+      .cm-promo-box {
+        margin-top: 4px;
+        padding: 8px 10px;
+        background: rgba(147, 51, 234, 0.12);
+        border: 1px solid rgba(168, 85, 247, 0.4);
+        border-radius: 3px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+
+      .cm-promo-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 6px;
+      }
+
+      .cm-promo-title {
+        font-size: 11px;
+        font-weight: 800;
+        color: #c084fc;
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        white-space: nowrap;
+      }
+
+      .cm-promo-badge {
+        font-size: 9px;
+        font-weight: 700;
+        padding: 1px 5px;
+        border-radius: 2px;
+        background: rgba(229, 155, 44, 0.2);
+        color: #e59b2c;
+        border: 1px solid rgba(229, 155, 44, 0.4);
+        white-space: nowrap;
+      }
+
+      .cm-promo-desc {
+        font-size: 11px;
+        color: #e2e8f0;
+        line-height: 1.4;
+      }
+
+      /* Material Bar & Exchange Evaluation */
+      .cm-material-bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background: #0b0e14;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 3px;
+        padding: 5px 10px;
+        font-size: 11px;
+        margin-bottom: 6px;
+      }
+
+      .cm-mat-scores {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-weight: 700;
+        color: #d1d5db;
+      }
+
+      .cm-mat-lead {
+        font-size: 10px;
+        font-weight: 700;
+        padding: 1px 6px;
+        border-radius: 2px;
+        white-space: nowrap;
+      }
+
+      .cm-strat-box {
+        margin-top: 4px;
+        padding: 8px 10px;
+        background: rgba(30, 41, 59, 0.6);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 3px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+
+      .cm-strat-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 6px;
+      }
+
+      .cm-strat-title {
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.3px;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+
+      .cm-strat-tag {
+        font-size: 9px;
+        font-weight: 700;
+        padding: 1px 5px;
+        border-radius: 2px;
+        background: rgba(255, 255, 255, 0.08);
+        color: #94a3b8;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        white-space: nowrap;
+      }
+
+      .cm-strat-advice {
+        font-size: 11px;
+        color: #cbd5e1;
+        line-height: 1.45;
       }
 
       .cm-instruction {
@@ -423,6 +589,25 @@ export class ChatHUD {
         justify-content: space-between;
       }
 
+      .cm-btn-secondary {
+        background: #1e222a;
+        color: #d1d5db;
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        padding: 6px 10px;
+        border-radius: 2px;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.4px;
+        cursor: pointer;
+        text-transform: uppercase;
+        transition: all 0.15s ease;
+      }
+
+      .cm-btn-secondary:hover {
+        background: #282e39;
+        color: #ffffff;
+      }
+
       .cm-btn-reanalyze {
         background: #e59b2c;
         color: #0c0e12;
@@ -445,6 +630,89 @@ export class ChatHUD {
         font-size: 10px;
         color: #808893;
         font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+
+      /* OTA Update Banner */
+      .cm-ota-banner {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background: linear-gradient(90deg, rgba(147, 51, 234, 0.25), rgba(59, 130, 246, 0.25));
+        border: 1px solid rgba(168, 85, 247, 0.4);
+        border-radius: 3px;
+        padding: 6px 10px;
+        font-size: 11px;
+        color: #f3e8ff;
+        margin-bottom: 6px;
+      }
+
+      .cm-ota-text {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .cm-ota-btn {
+        background: #9333ea;
+        color: #ffffff !important;
+        text-decoration: none;
+        padding: 3px 8px;
+        border-radius: 2px;
+        font-size: 10px;
+        font-weight: 800;
+        letter-spacing: 0.4px;
+        transition: background 0.15s;
+        white-space: nowrap;
+      }
+
+      .cm-ota-btn:hover {
+        background: #a855f7;
+      }
+
+      /* Mobile Touch & Responsive Bottom Sheet */
+      @media (max-width: 640px), (max-height: 700px) {
+        #chessmate-hud-root {
+          left: 8px !important;
+          right: 8px !important;
+          bottom: 8px !important;
+          top: auto !important;
+          width: auto !important;
+          max-width: 100vw !important;
+          height: 380px !important;
+          max-height: 48vh !important;
+          border-radius: 8px !important;
+          box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.9) !important;
+        }
+
+        #chessmate-bubble-root {
+          bottom: 16px !important;
+          right: 16px !important;
+          padding: 10px 16px !important;
+          border-radius: 24px !important;
+          font-size: 11px !important;
+          box-shadow: 0 4px 20px rgba(0, 0, 0, 0.75) !important;
+        }
+
+        .cm-hud-header {
+          padding: 8px 12px;
+        }
+
+        .cm-tab-btn {
+          padding: 8px 0;
+          font-size: 11px;
+          touch-action: manipulation;
+        }
+
+        .cm-side-btn {
+          padding: 5px 10px !important;
+          font-size: 11px !important;
+          touch-action: manipulation;
+        }
+
+        .cm-btn-ctl {
+          width: 32px;
+          height: 28px;
+        }
       }
     `;
     document.head.append(style);
@@ -485,9 +753,14 @@ export class ChatHUD {
 
       <div class="cm-hud-footer">
         <span class="cm-footer-status" id="cm-status-text">[SẴN SÀNG]</span>
-        <button class="cm-btn-reanalyze" id="cm-btn-reanalyze">
-          QUÉT LẠI BÀN CỜ
-        </button>
+        <div style="display:flex;gap:6px;">
+          <button class="cm-btn-secondary" id="cm-btn-new-game" title="Bắt đầu ván mới (reset toàn bộ)">
+            VÁN MỚI
+          </button>
+          <button class="cm-btn-reanalyze" id="cm-btn-reanalyze">
+            QUÉT LẠI
+          </button>
+        </div>
       </div>
     `;
 
@@ -512,6 +785,11 @@ export class ChatHUD {
         this.renderBody();
       };
     });
+
+    this.root.querySelector('#cm-btn-new-game').onclick = () => {
+      this.status('[VÁN CỜ MỚI]', true);
+      this.onNewGame?.();
+    };
 
     this.root.querySelector('#cm-btn-reanalyze').onclick = () => {
       this.status('[ĐANG QUÉT BÀN CỜ...]', true);
@@ -562,6 +840,17 @@ export class ChatHUD {
     if (bubbleText) bubbleText.textContent = text;
   }
 
+  reset() {
+    this.moveHistory = [];
+    this.currentFen = null;
+    this.lastBestMove = null;
+    this.lastEvaluation = 0;
+    this.status('Ván cờ mới: Sẵn sàng');
+    this.renderBody();
+    const bubbleText = this.bubble?.querySelector('#cm-bubble-text');
+    if (bubbleText) bubbleText.textContent = 'ChessMate AI';
+  }
+
   updateConfig(cfg) {
     this.config = { ...this.config, ...cfg };
     if (cfg.thinkingMode && cfg.thinkingMode !== this.activeMode) {
@@ -575,29 +864,45 @@ export class ChatHUD {
     }
   }
 
-  updateAnalysis({ fen, uci, evaluation, depth, playedMoves = [] }) {
+  updateAnalysis({ fen, uci, evaluation, depth, userColor = 'w', isMyTurn = true, playedMoves = [], efficiencyNote = null }) {
     this.currentFen = fen;
     this.lastBestMove = uci;
     this.lastEvaluation = evaluation;
+    this.lastEfficiencyNote = efficiencyNote;
+    this.userColor = this.sideOverride || userColor;
+    this.isMyTurn = isMyTurn;
 
     const translation = translateMoveToVietnamese(uci, fen);
     const evalText = formatEvaluationVi(evaluation);
 
-    // Update history
-    this.moveHistory.unshift({
-      time: new Date().toLocaleTimeString(),
-      short: translation.short || uci,
-      title: translation.title,
-      eval: evalText
-    });
-    if (this.moveHistory.length > 20) this.moveHistory.pop();
+    // Only add to moveHistory if it's OUR move
+    if (this.isMyTurn) {
+      if (this.moveHistory.length === 0 || this.moveHistory[0].uci !== uci) {
+        this.moveHistory.unshift({
+          uci,
+          time: new Date().toLocaleTimeString(),
+          short: translation.short || uci,
+          title: translation.title,
+          eval: evalText
+        });
+        if (this.moveHistory.length > 20) this.moveHistory.pop();
+      }
+      this.status(`[LƯỢT BẠN] ${uci.toUpperCase()} (D${depth})`, false);
+    } else {
+      this.status(`[ĐỐI THỦ ĐANG NGHĨ] Đang chờ đối thủ...`, false);
+    }
 
     this.renderBody();
-    this.status(`[XONG] ${uci.toUpperCase()} (D${depth})`, false);
 
     // Update bubble title
     const bubbleText = this.bubble?.querySelector('#cm-bubble-text');
-    if (bubbleText) bubbleText.textContent = `[${uci.toUpperCase()}] ${translation.short || ''}`;
+    if (bubbleText) {
+      if (this.isMyTurn) {
+        bubbleText.textContent = `[${uci.toUpperCase()}] ${translation.short || ''}`;
+      } else {
+        bubbleText.textContent = `[ĐỢI ĐỐI THỦ]`;
+      }
+    }
   }
 
   renderBody() {
@@ -615,39 +920,174 @@ export class ChatHUD {
 
   renderChatTab(body) {
     const translation = this.lastBestMove ? translateMoveToVietnamese(this.lastBestMove, this.currentFen) : null;
-    const evalText = formatEvaluationVi(this.lastEvaluation);
+    const evalParts = formatEvaluationParts(this.lastEvaluation);
     const modeCfg = getModeConfig(this.activeMode);
+
+    const activeSide = this.sideOverride || this.userColor;
+    const myColorName = activeSide === 'w' ? 'Trắng ⚪' : 'Đen ⚫';
+    const oppColorName = activeSide === 'w' ? 'Đen ⚫' : 'Trắng ⚪';
+
+    const material = calculateMaterial(this.currentFen);
+    const strat = evaluateMoveStrategy({
+      fen: this.currentFen,
+      uci: this.lastBestMove,
+      evaluation: this.lastEvaluation,
+      userColor: activeSide
+    });
 
     let html = '';
 
-    if (translation && this.lastBestMove) {
+    // OTA Update Alert Banner
+    if (this.otaInfo && this.otaInfo.hasUpdate) {
+      const changelogSnippet = (this.otaInfo.changelog && this.otaInfo.changelog[0]) ? this.otaInfo.changelog[0] : 'Đã có bản cập nhật mới!';
       html += `
-        <div class="cm-card">
-          <div class="cm-card-head">
-            <span class="cm-tag">${modeCfg.badge}</span>
-            <span class="cm-eval">${evalText}</span>
+        <div class="cm-ota-banner">
+          <div class="cm-ota-text">
+            <span>🚀</span>
+            <span><strong>v${this.otaInfo.latestVersion}</strong>: ${changelogSnippet}</span>
           </div>
-          <div class="cm-instruction">
-            ${translation.title}
-          </div>
-          <div class="cm-reason">
-            <strong>Chiến thuật:</strong> ${translation.desc}
-          </div>
-
-          <div class="cm-explain-box">
-            <button class="cm-btn-explain" id="cm-btn-ai-explain">
-              PHÂN TÍCH CHIẾN THUẬT SÂU
-            </button>
-            <div id="cm-ai-result-box" style="display:none;" class="cm-explain-result"></div>
-          </div>
+          <a class="cm-ota-btn" href="${this.otaInfo.downloadUrl || 'https://github.com/userlethekhoi/Extension-Chess.Com/releases/latest'}" target="_blank" rel="noopener noreferrer">CẬP NHẬT</a>
         </div>
       `;
+    }
+
+    // Side selection bar at top of chat tab
+    html += `
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;background:#0d1117;border:1px solid rgba(255,255,255,0.08);border-radius:4px;margin-bottom:6px;font-size:11px;">
+        <span style="color:#9ca3af;font-weight:600;">Bạn cầm quân:</span>
+        <div style="display:flex;gap:4px;">
+          <button class="cm-side-btn" data-side="w" style="padding:3px 8px;font-size:10px;border-radius:2px;cursor:pointer;background:${activeSide === 'w' ? '#e59b2c' : '#1e222a'};color:${activeSide === 'w' ? '#000' : '#d1d5db'};border:1px solid rgba(255,255,255,0.1);font-weight:700;">⚪ TRẮNG</button>
+          <button class="cm-side-btn" data-side="b" style="padding:3px 8px;font-size:10px;border-radius:2px;cursor:pointer;background:${activeSide === 'b' ? '#e59b2c' : '#1e222a'};color:${activeSide === 'b' ? '#000' : '#d1d5db'};border:1px solid rgba(255,255,255,0.1);font-weight:700;">⚫ ĐEN</button>
+          <button class="cm-side-btn" data-side="auto" style="padding:3px 6px;font-size:10px;border-radius:2px;cursor:pointer;background:${!this.sideOverride ? '#374151' : '#1e222a'};color:${!this.sideOverride ? '#fff' : '#6b7280'};border:1px solid rgba(255,255,255,0.1);" title="Tự động nhận diện bên theo hướng xoay bàn cờ">TỰ ĐỘNG</button>
+        </div>
+      </div>
+    `;
+
+    // Material Balance Bar
+    if (material) {
+      const myScore = activeSide === 'w' ? material.whiteScore : material.blackScore;
+      const oppScore = activeSide === 'w' ? material.blackScore : material.whiteScore;
+      const leadDiff = Math.round((myScore - oppScore) * 10) / 10;
+      let leadBadge = '';
+      if (leadDiff > 0.5) {
+        leadBadge = `<span class="cm-mat-lead" style="background:rgba(34,197,94,0.18);color:#22c55e;border:1px solid rgba(34,197,94,0.4);">Bạn hơn +${leadDiff}đ</span>`;
+      } else if (leadDiff < -0.5) {
+        leadBadge = `<span class="cm-mat-lead" style="background:rgba(239,68,68,0.18);color:#f87171;border:1px solid rgba(239,68,68,0.4);">Đối thủ hơn +${Math.abs(leadDiff)}đ</span>`;
+      } else {
+        leadBadge = `<span class="cm-mat-lead" style="background:rgba(255,255,255,0.08);color:#94a3b8;border:1px solid rgba(255,255,255,0.15);">Lực lượng cân bằng</span>`;
+      }
+
+      html += `
+        <div class="cm-material-bar">
+          <div class="cm-mat-scores">
+            <span>Bạn: <strong style="color:#ffffff;">${myScore}đ</strong></span>
+            <span style="color:#64748b;">⚔️</span>
+            <span>Địch: <strong style="color:#ffffff;">${oppScore}đ</strong></span>
+          </div>
+          ${leadBadge}
+        </div>
+      `;
+    }
+
+    if (translation && this.lastBestMove) {
+      const stratBoxHtml = strat ? `
+        <div class="cm-strat-box" style="border-left: 3px solid ${strat.color};">
+          <div class="cm-strat-head">
+            <span class="cm-strat-title" style="color: ${strat.color};">${strat.badge}</span>
+            <span class="cm-strat-tag">${strat.tag}</span>
+          </div>
+          <div class="cm-strat-advice">${strat.advice}</div>
+        </div>
+      ` : '';
+
+      const efficiencyHtml = this.lastEfficiencyNote ? `
+        <div style="display:flex;align-items:center;gap:6px;font-size:10.5px;font-weight:700;color:#38bdf8;background:rgba(56,189,248,0.08);border:1px solid rgba(56,189,248,0.25);border-radius:2px;padding:4px 8px;margin-top:2px;">
+          <span>⚡</span>
+          <span>${this.lastEfficiencyNote}</span>
+        </div>
+      ` : '';
+
+      if (this.isMyTurn) {
+        // CASE: OUR TURN
+        const promoBoxHtml = translation.promotion ? `
+          <div class="cm-promo-box">
+            <div class="cm-promo-head">
+              <span class="cm-promo-title">⭐ KHUYÊN DÙNG: PHONG ${translation.promoName?.toUpperCase() || 'HẬU'} ${translation.promoSymbol || '👑'}</span>
+              ${translation.promotion !== 'q' 
+                ? '<span class="cm-promo-badge" style="background:rgba(239,68,68,0.2);color:#f87171;border-color:rgba(239,68,68,0.4);">⚡ UNDERPROMOTION</span>' 
+                : '<span class="cm-promo-badge">TỐI ƯU HỎA LỰC +9</span>'}
+            </div>
+            <div class="cm-promo-desc">
+              ${translation.desc}
+            </div>
+          </div>
+        ` : '';
+
+        html += `
+          <div class="cm-card" style="border: 1px solid rgba(34, 197, 94, 0.45); box-shadow: 0 0 14px rgba(34,197,94,0.12);">
+            <div class="cm-card-head">
+              <span class="cm-tag" style="background:rgba(34,197,94,0.15);color:#22c55e;border-color:rgba(34,197,94,0.4);">
+                LƯỢT CỦA BẠN (${myColorName})
+              </span>
+              <span class="cm-eval-chip" title="${evalParts.full}">${evalParts.numeric}</span>
+            </div>
+            <div class="cm-eval-subrow">
+              <span class="cm-eval-dot"></span>
+              <span>${evalParts.desc}</span>
+            </div>
+
+            <div class="cm-instruction" style="color:#22c55e;font-size:14px;font-weight:700;">
+              ${translation.title}
+            </div>
+            <div class="cm-reason">
+              <strong>Chiến thuật:</strong> ${translation.desc}
+            </div>
+
+            ${stratBoxHtml}
+            ${efficiencyHtml}
+            ${promoBoxHtml}
+
+            <div class="cm-explain-box">
+              <button class="cm-btn-explain" id="cm-btn-ai-explain">
+                PHÂN TÍCH CHIẾN THUẬT SÂU
+              </button>
+              <div id="cm-ai-result-box" style="display:none;" class="cm-explain-result"></div>
+            </div>
+          </div>
+        `;
+      } else {
+        // CASE: OPPONENT'S TURN
+        html += `
+          <div class="cm-card" style="border: 1px solid rgba(234, 179, 8, 0.3); background: rgba(20, 23, 29, 0.95);">
+            <div class="cm-card-head">
+              <span class="cm-tag" style="background:rgba(234,179,8,0.15);color:#eab308;border-color:rgba(234,179,8,0.4);">
+                LƯỢT ĐỐI THỦ (${oppColorName})
+              </span>
+              <span class="cm-eval-chip" style="color:#eab308;background:rgba(234,179,8,0.12);border-color:rgba(234,179,8,0.3);" title="${evalParts.full}">${evalParts.numeric}</span>
+            </div>
+            <div class="cm-eval-subrow">
+              <span class="cm-eval-dot" style="background:#eab308;"></span>
+              <span>${evalParts.desc}</span>
+            </div>
+
+            <div class="cm-instruction" style="color:#eab308;font-size:13px;font-weight:600;">
+              Đang đợi đối thủ (${oppColorName}) đi nước cờ...
+            </div>
+            <div class="cm-reason" style="font-size:11px;color:#9ca3af;line-height:1.5;">
+              <strong>Dự đoán nước tốt nhất của đối thủ:</strong> ${translation.title}
+              <br><span style="color:#6b7280;">Hệ thống sẽ gợi ý nước cờ chuẩn cho bạn ngay khi đối thủ đi xong.</span>
+            </div>
+
+            ${stratBoxHtml}
+          </div>
+        `;
+      }
     } else {
       html += `
         <div class="cm-card" style="text-align: center; padding: 28px 12px;">
           <div style="font-weight: 700; color: #ffffff; margin-bottom: 4px;">ĐANG CHỜ LƯỢT ĐI</div>
           <div style="font-size: 11px; color: #808893; line-height: 1.45;">
-            Hệ thống tự động phân tích và đưa ra tên quân cờ kèm ô di chuyển ngay khi đối thủ đi xong.
+            Hệ thống tự động phân tích và đưa ra tên quân cờ kèm ô di chuyển khi đến lượt bạn.
           </div>
         </div>
       `;
@@ -672,6 +1112,16 @@ export class ChatHUD {
 
     body.innerHTML = html;
 
+    // Hook side buttons
+    body.querySelectorAll('.cm-side-btn').forEach(btn => {
+      btn.onclick = () => {
+        const side = btn.getAttribute('data-side');
+        this.sideOverride = (side === 'auto') ? null : side;
+        if (this.onReanalyze) this.onReanalyze();
+        else this.renderBody();
+      };
+    });
+
     // Hook tactical explain button
     const explainBtn = body.querySelector('#cm-btn-ai-explain');
     if (explainBtn) {
@@ -694,6 +1144,8 @@ export class ChatHUD {
           const explanation = await explainMove({
             fen: this.currentFen,
             move: this.lastBestMove,
+            evaluation: this.lastEvaluation,
+            userColor: this.sideOverride || this.userColor,
             provider: this.config.llmProvider || 'openai',
             apiKey: this.config.llmApiKey
           });
@@ -814,6 +1266,57 @@ export class ChatHUD {
 
       document.addEventListener('mousemove', onMouseMove);
       document.addEventListener('mouseup', onMouseUp);
+    };
+
+    // Touch dragging & swipe support for mobile
+    handle.ontouchstart = (e) => {
+      if (e.target.closest('button')) return;
+      if (!e.touches || e.touches.length === 0) return;
+      const touch = e.touches[0];
+      isDragging = true;
+      startX = touch.clientX;
+      startY = touch.clientY;
+
+      const rect = this.root.getBoundingClientRect();
+      initialLeft = rect.left;
+      initialTop = rect.top;
+
+      const onTouchMove = (moveEvent) => {
+        if (!isDragging || !moveEvent.touches || moveEvent.touches.length === 0) return;
+        const moveTouch = moveEvent.touches[0];
+        const dx = moveTouch.clientX - startX;
+        const dy = moveTouch.clientY - startY;
+
+        // If swiping down more than 100px from the handle, smoothly minimize HUD
+        if (dy > 100 && Math.abs(dx) < 60) {
+          isDragging = false;
+          cleanupTouch();
+          this.minimize();
+          return;
+        }
+
+        const maxLeft = window.innerWidth - this.root.offsetWidth - 8;
+        const maxTop = window.innerHeight - this.root.offsetHeight - 8;
+
+        const newLeft = Math.max(8, Math.min(maxLeft, initialLeft + dx));
+        const newTop = Math.max(8, Math.min(maxTop, initialTop + dy));
+
+        this.root.style.bottom = 'auto';
+        this.root.style.right = 'auto';
+        this.root.style.left = `${newLeft}px`;
+        this.root.style.top = `${newTop}px`;
+      };
+
+      const cleanupTouch = () => {
+        isDragging = false;
+        document.removeEventListener('touchmove', onTouchMove);
+        document.removeEventListener('touchend', cleanupTouch);
+        document.removeEventListener('touchcancel', cleanupTouch);
+      };
+
+      document.addEventListener('touchmove', onTouchMove, { passive: true });
+      document.addEventListener('touchend', cleanupTouch);
+      document.addEventListener('touchcancel', cleanupTouch);
     };
   }
 }

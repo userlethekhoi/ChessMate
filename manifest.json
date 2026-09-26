@@ -2,13 +2,16 @@
   "manifest_version": 3,
   "name": "ChessMate Agent",
   "version": "0.1.0",
+  "update_url": "https://raw.githubusercontent.com/userlethekhoi/Extension-Chess.Com/main/updates.xml",
   "description": "Event-driven chess analysis assistant for practice and bot games.",
   "permissions": ["storage", "activeTab", "scripting", "offscreen"],
   "host_permissions": [
     "https://www.chess.com/*",
     "https://chess.com/*",
     "https://generativelanguage.googleapis.com/*",
-    "https://api.openai.com/*"
+    "https://api.openai.com/*",
+    "https://raw.githubusercontent.com/*",
+    "https://api.github.com/*"
   ],
   "action": { "default_title": "ChessMate Agent", "default_popup": "src/popup/popup.html" },
   "background": { "service_worker": "src/background/service-worker.js", "type": "module" },
