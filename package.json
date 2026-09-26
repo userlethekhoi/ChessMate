@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "pack": "vite build && powershell -Command \"Compress-Archive -Path dist/* -DestinationPath chessmate-agent.zip -Force\"",
+    "pack": "vite build && node scripts/package-zip.js",
     "version:bump": "node scripts/bump-version.js",
     "test": "node --test tests/*.test.js"
   },
