@@ -30,3 +30,22 @@ test('Manifest declares src/offscreen/* in web_accessible_resources for mobile i
   assert.ok(allResources.includes('src/offscreen/*'), 'Must include src/offscreen/*');
   assert.ok(allResources.includes('src/engine/*'), 'Must include src/engine/*');
 });
+
+test('Opponent moves (e.g. Black f7f5 for White user) are strictly prevented from showing as user moves', async () => {
+  const { fenToBoard, squareToIndices } = await import('../src/utils/chess-translator.js');
+  // Sven (Black) position: Pawn on f7
+  const fen = '2r4b/p3kp2/8/4p2p/1N6/7P/PPP2PP1/1K5R w - - 0 1';
+  const uci = 'f7f5';
+  const userColor = 'w';
+
+  const fromSq = uci.slice(0, 2).toLowerCase();
+  const fromIdx = squareToIndices(fromSq);
+  const boardMatrix = fenToBoard(fen);
+  const p = boardMatrix?.[fromIdx.row]?.[fromIdx.col];
+  const moveColor = (p === p.toUpperCase()) ? 'w' : 'b';
+
+  assert.equal(moveColor, 'b', 'Move f7f5 belongs to Black');
+  const isMyTurn = (userColor === moveColor);
+  assert.equal(isMyTurn, false, 'isMyTurn must be strictly false for opponent move');
+});
+

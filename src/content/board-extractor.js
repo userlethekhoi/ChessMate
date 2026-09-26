@@ -464,45 +464,47 @@ export function getUserColor(board = findBoardElement()) {
  * If Black piece moved -> now White's turn ('w').
  */
 function detectTurnFromHighlightPiece(board) {
-  const highlights = board.querySelectorAll('.highlight, [class*="highlight"]');
-  if (highlights.length < 2) return null;
+  const rawHighlights = board.querySelectorAll('.highlight, [class*="highlight"]');
+  if (rawHighlights.length < 2) return null;
 
-  const allPieces = board.querySelectorAll('.piece, [class*="piece"], [data-piece]');
+  const highlights = Array.from(rawHighlights);
 
-  for (const h of highlights) {
+  // Iterate highlights in reverse order (destination square is usually the most recent highlight in DOM)
+  const candidatePieces = [];
+  for (let i = highlights.length - 1; i >= 0; i--) {
+    const h = highlights[i];
     const cls = String(h.getAttribute('class') || h.className || '');
-    const m = cls.match(/square-0?([1-8])0?([1-8])/);
-    if (!m) continue;
-    const file = parseInt(m[1], 10);
-    const rank = parseInt(m[2], 10);
-    const sqClass = `square-${m[1]}${m[2]}`;
+    let sqStr = null;
 
-    // Find any live piece on this highlighted square
-    for (const p of allPieces) {
-      if (!isPieceAlive(p)) continue;
-      const pCls = String(p.getAttribute('class') || p.className || '');
-      if (pCls.includes(sqClass)) {
-        const val = readPieceFromSquare(p);
-        if (val) {
-          const isWhite = val === val.toUpperCase();
-          const nextTurn = isWhite ? 'b' : 'w';
-          logger.info(`Turn detected from moved piece ${val} on ${sqClass} (${isWhite ? 'White' : 'Black'} moved) → turn=${nextTurn}`);
-          return nextTurn;
-        }
+    const mNum = cls.match(/square-0?([1-8])0?([1-8])/);
+    if (mNum) {
+      const file = parseInt(mNum[1], 10);
+      const rank = parseInt(mNum[2], 10);
+      sqStr = `${'abcdefgh'[file - 1]}${rank}`;
+    } else {
+      const mAlpha = cls.match(/square-([a-h])([1-8])/i);
+      if (mAlpha) {
+        sqStr = `${mAlpha[1].toLowerCase()}${mAlpha[2]}`;
       }
     }
+    if (!sqStr) continue;
 
-    // Direct square element check fallback
-    const square = findSquare(board, rank, file);
-    if (square) {
-      const pieceVal = readPieceFromSquare(square);
-      if (pieceVal) {
-        const isWhite = pieceVal === pieceVal.toUpperCase();
-        const nextTurn = isWhite ? 'b' : 'w';
-        logger.info(`Turn detected from square element on ${file},${rank}: piece=${pieceVal} → turn=${nextTurn}`);
-        return nextTurn;
+    // Use getPieceOnSquare which checks classes, data-square, and physical screen geometry
+    const p = getPieceOnSquare(board, sqStr);
+    if (p && isPieceAlive(p)) {
+      const val = readPieceFromSquare(p);
+      if (val) {
+        const isWhite = val === val.toUpperCase();
+        candidatePieces.push({ sqStr, val, isWhite });
       }
     }
+  }
+
+  if (candidatePieces.length > 0) {
+    const moved = candidatePieces[0];
+    const nextTurn = moved.isWhite ? 'b' : 'w';
+    logger.info(`Turn detected from moved piece ${moved.val} on ${moved.sqStr} (${moved.isWhite ? 'White' : 'Black'} moved) → turn=${nextTurn}`);
+    return nextTurn;
   }
 
   return null;

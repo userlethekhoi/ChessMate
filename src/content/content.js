@@ -6,6 +6,7 @@ import { executeMove } from './move-executor.js';
 import { EngineManager } from '../engine/engine-manager.js';
 import { getConfig, onChange } from '../storage/config-manager.js';
 import { clearLlmCache } from '../ai/llm-client.js';
+import { fenToBoard, squareToIndices } from '../utils/chess-translator.js';
 import { logger } from '../utils/logger.js';
 
 const observer = new BoardObserver();
@@ -107,7 +108,33 @@ async function analyzeCurrentState(forcedFen = null) {
 
     const turn = fen.split(' ')[1] || 'w';
     const effectiveUserColor = chatHud?.sideOverride || getUserColor(board);
-    const isMyTurn = (turn === effectiveUserColor);
+
+    // Determine the actual side of the recommended move from the piece at fromSq:
+    let moveColor = turn;
+    if (best.move && best.move.length >= 4) {
+      const fromSq = best.move.slice(0, 2).toLowerCase();
+      const fromIdx = squareToIndices(fromSq);
+      if (fromIdx) {
+        const boardMatrix = fenToBoard(fen);
+        const p = boardMatrix?.[fromIdx.row]?.[fromIdx.col];
+        if (p) {
+          moveColor = (p === p.toUpperCase()) ? 'w' : 'b';
+        }
+      }
+    }
+
+    // Stale guard: If it is user's turn on board, but engine returned opponent's move,
+    // discard and trigger fresh analysis for user's turn
+    if (turn === effectiveUserColor && moveColor !== effectiveUserColor) {
+      logger.info(`[ChessMate] Discarded stale opponent move (${best.move}) during user turn (${effectiveUserColor}). Triggering fresh analysis.`);
+      setTimeout(() => {
+        if (!isAnalyzing) analyzeCurrentState();
+      }, 100);
+      return;
+    }
+
+    // It is ONLY our turn if turn matches user color AND the move belongs to user's side
+    const isMyTurn = (turn === effectiveUserColor) && (moveColor === effectiveUserColor);
 
     // Update Chat HUD with side, turn context, and shortest path efficiency note
     chatHud?.updateAnalysis({

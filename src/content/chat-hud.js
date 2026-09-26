@@ -1,4 +1,4 @@
-import { translateMoveToVietnamese, formatEvaluationVi, formatEvaluationParts } from '../utils/chess-translator.js';
+import { translateMoveToVietnamese, formatEvaluationVi, formatEvaluationParts, fenToBoard, squareToIndices } from '../utils/chess-translator.js';
 import { calculateMaterial, evaluateMoveStrategy, PIECE_VALUES } from '../utils/board-evaluator.js';
 import { checkForUpdates } from '../utils/ota-updater.js';
 import { TACTICAL_LESSONS } from '../ai/chess-book.js';
@@ -1041,7 +1041,27 @@ export class ChatHUD {
     this.lastEvaluation = evaluation;
     this.lastEfficiencyNote = efficiencyNote;
     this.userColor = this.sideOverride || userColor;
-    this.isMyTurn = isMyTurn;
+
+    // Detect actual move color from the piece on the from-square
+    let moveColor = null;
+    if (fen && uci && uci.length >= 4) {
+      const fromSq = uci.slice(0, 2).toLowerCase();
+      const fromIdx = squareToIndices(fromSq);
+      if (fromIdx) {
+        const boardMatrix = fenToBoard(fen);
+        const p = boardMatrix?.[fromIdx.row]?.[fromIdx.col];
+        if (p) {
+          moveColor = (p === p.toUpperCase()) ? 'w' : 'b';
+        }
+      }
+    }
+
+    // A move for the opponent can NEVER be "my turn"
+    if (moveColor && moveColor !== this.userColor) {
+      this.isMyTurn = false;
+    } else {
+      this.isMyTurn = isMyTurn;
+    }
 
     const translation = translateMoveToVietnamese(uci, fen);
     const evalText = formatEvaluationVi(evaluation);
@@ -1069,9 +1089,8 @@ export class ChatHUD {
     const miniBadge = this.root.querySelector('#cm-mini-badge');
     const miniMove = this.root.querySelector('#cm-mini-move');
     if (miniBadge && miniMove) {
-      const activeSide = this.sideOverride || this.userColor;
       if (this.isMyTurn) {
-        miniBadge.textContent = `${activeSide === 'w' ? 'W' : 'B'}: ${uci.toUpperCase()}`;
+        miniBadge.textContent = `${this.userColor === 'w' ? 'W' : 'B'}: ${uci.toUpperCase()}`;
         miniMove.textContent = `${translation.short || translation.title} (${evalText})`;
       } else {
         miniBadge.textContent = `ĐỢI LƯỢT`;
