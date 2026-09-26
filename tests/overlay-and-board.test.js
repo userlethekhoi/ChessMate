@@ -86,6 +86,30 @@ test('Overlay percentage coordinate calculations are exact', () => {
   assert.deepEqual(getPos('h8', true), { x: 6.25, y: 93.75 });
 });
 
+test('getSquareBoardPos produces exact 800x800 coordinates for chessboard squares', async () => {
+  const { getSquareBoardPos } = await import('../src/content/overlay.js');
+
+  // White perspective:
+  // a1 (col 0, row 7) -> (50, 750)
+  assert.deepEqual(getSquareBoardPos('a1', false), { x: 50, y: 750 });
+  // d2 (col 3, row 6) -> (350, 650)
+  assert.deepEqual(getSquareBoardPos('d2', false), { x: 350, y: 650 });
+  // d4 (col 3, row 4) -> (350, 450)
+  assert.deepEqual(getSquareBoardPos('d4', false), { x: 350, y: 450 });
+  // e4 (col 4, row 4) -> (450, 450)
+  assert.deepEqual(getSquareBoardPos('e4', false), { x: 450, y: 450 });
+  // h8 (col 7, row 0) -> (750, 50)
+  assert.deepEqual(getSquareBoardPos('h8', false), { x: 750, y: 50 });
+
+  // Black perspective (flipped):
+  // a1 (col 7, row 0) -> (750, 50)
+  assert.deepEqual(getSquareBoardPos('a1', true), { x: 750, y: 50 });
+  // d7 (col 4, row 6) -> (450, 650)
+  assert.deepEqual(getSquareBoardPos('d7', true), { x: 450, y: 650 });
+  // d5 (col 4, row 4) -> (450, 450)
+  assert.deepEqual(getSquareBoardPos('d5', true), { x: 450, y: 450 });
+});
+
 test('getPieceOnSquare and getSquareCenter locate real DOM piece accurately', async () => {
   const { getPieceOnSquare, getSquareCenter } = await import('../src/content/board-extractor.js');
 

@@ -24,7 +24,7 @@
   "content_scripts": [
     {
       "js": [
-        "assets/content.js-loader-qvx2KlUy.js"
+        "assets/content.js-loader-BDUsQExv.js"
       ],
       "matches": [
         "https://www.chess.com/*",
@@ -46,7 +46,7 @@
         "assets/llm-client-CDOB8dke.js",
         "assets/board-evaluator-BmEPwPFI.js",
         "assets/engine-manager-Dsi34YoY.js",
-        "assets/content.js-HHH7SHEw.js"
+        "assets/content.js-BTfyoKXU.js"
       ],
       "use_dynamic_url": false
     }
