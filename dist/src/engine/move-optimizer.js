@@ -95,7 +95,7 @@ export function selectShortestAndMostDirectMove({
       evaluation: `#${fastest.mateIn}`,
       mateIn: fastest.mateIn,
       pv: fastest.pv || [],
-      efficiencyNote: `⚡ CHIẾU HẾT NHANH NHẤT: Dứt điểm ván cờ chỉ trong ${fastest.mateIn} nước!`
+      efficiencyNote: `CHIẾU HẾT NHANH NHẤT: Dứt điểm ván cờ chỉ trong ${fastest.mateIn} nước!`
     };
   }
 
@@ -109,7 +109,7 @@ export function selectShortestAndMostDirectMove({
       evaluation: `#${bestDef.mateIn}`,
       mateIn: bestDef.mateIn,
       pv: bestDef.pv || [],
-      efficiencyNote: `🛡️ PHÒNG THỦ KÉO DÀI THỜI GIAN: Hóa giải đòn sát thủ của địch (${Math.abs(bestDef.mateIn)} nước)`
+      efficiencyNote: `PHÒNG THỦ KÉO DÀI THỜI GIAN: Hóa giải đòn sát thủ của địch (${Math.abs(bestDef.mateIn)} nước)`
     };
   }
 
@@ -133,11 +133,11 @@ export function selectShortestAndMostDirectMove({
     competitiveGroup.sort((a, b) => (b.directnessScore || 0) - (a.directnessScore || 0));
     const chosen = competitiveGroup[0];
 
-    let efficiencyNote = '🎯 Nước đi tối ưu hóa vị trí và kiểm soát không gian';
+    let efficiencyNote = 'Nước đi tối ưu hóa vị trí và kiểm soát không gian';
     if (chosen.directnessScore >= 10) {
-      efficiencyNote = '⚡ ĐÒN ĐÁNH TRỰC DIỆN: Tiêu diệt mục tiêu chủ lực trong 1 bước dứt khoát!';
+      efficiencyNote = 'ĐÒN ĐÁNH TRỰC DIỆN: Tiêu diệt mục tiêu chủ lực trong 1 bước dứt khoát!';
     } else if (chosen.directnessScore >= 5) {
-      efficiencyNote = '🎯 LỘ TRÌNH NGẮN NHẤT: Nước đi cưỡng bức, triệt tiêu thời gian phản kích của đối phương.';
+      efficiencyNote = 'LỘ TRÌNH NGẮN NHẤT: Nước đi cưỡng bức, triệt tiêu thời gian phản kích của đối phương.';
     }
 
     return {

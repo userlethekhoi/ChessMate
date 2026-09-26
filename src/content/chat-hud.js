@@ -841,7 +841,7 @@ export class ChatHUD {
           <span class="cm-mini-move" id="cm-mini-move">Đang chờ lượt đi...</span>
         </div>
         <div class="cm-mini-actions">
-          <button class="cm-btn-compact-expand" id="cm-btn-mini-expand" title="Mở rộng HUD">▲ Mở</button>
+          <button class="cm-btn-compact-expand" id="cm-btn-mini-expand" title="Mở rộng HUD">MỞ</button>
           <button class="cm-btn-ctl" id="cm-btn-mini-bubble" title="Thu thành bong bóng">-</button>
         </div>
       </div>
@@ -1000,10 +1000,10 @@ export class ChatHUD {
     const miniMove = this.root?.querySelector('#cm-mini-move');
     if (miniMove) {
       if (analyzing) {
-        if (miniBadge) miniBadge.textContent = '⏳ TÍNH TOÁN';
+        if (miniBadge) miniBadge.textContent = 'TÍNH TOÁN';
         miniMove.textContent = text || 'Đang suy nghĩ nước cờ...';
       } else if (text?.startsWith('Engine: ') || text?.startsWith('Quét: ') || text?.startsWith('Lỗi')) {
-        if (miniBadge) miniBadge.textContent = '⚠️ LỖI';
+        if (miniBadge) miniBadge.textContent = 'LỖI';
         miniMove.textContent = text;
       } else if (!this.lastBestMove) {
         miniMove.textContent = text;
@@ -1071,10 +1071,10 @@ export class ChatHUD {
     if (miniBadge && miniMove) {
       const activeSide = this.sideOverride || this.userColor;
       if (this.isMyTurn) {
-        miniBadge.textContent = `${activeSide === 'w' ? '⚪' : '⚫'} ${uci.toUpperCase()}`;
+        miniBadge.textContent = `${activeSide === 'w' ? 'W' : 'B'}: ${uci.toUpperCase()}`;
         miniMove.textContent = `${translation.short || translation.title} (${evalText})`;
       } else {
-        miniBadge.textContent = `⏳ ĐỢI ĐỊCH`;
+        miniBadge.textContent = `ĐỢI LƯỢT`;
         miniMove.textContent = `Dự đoán: ${translation.short || translation.title}`;
       }
     }
@@ -1109,8 +1109,8 @@ export class ChatHUD {
     const modeCfg = getModeConfig(this.activeMode);
 
     const activeSide = this.sideOverride || this.userColor;
-    const myColorName = activeSide === 'w' ? 'Trắng ⚪' : 'Đen ⚫';
-    const oppColorName = activeSide === 'w' ? 'Đen ⚫' : 'Trắng ⚪';
+    const myColorName = activeSide === 'w' ? 'Trắng' : 'Đen';
+    const oppColorName = activeSide === 'w' ? 'Đen' : 'Trắng';
 
     const material = calculateMaterial(this.currentFen);
     const strat = evaluateMoveStrategy({
@@ -1128,7 +1128,6 @@ export class ChatHUD {
       html += `
         <div class="cm-ota-banner">
           <div class="cm-ota-text">
-            <span>🚀</span>
             <span><strong>v${this.otaInfo.latestVersion}</strong>: ${changelogSnippet}</span>
           </div>
           <a class="cm-ota-btn" href="${this.otaInfo.downloadUrl || 'https://github.com/userlethekhoi/Extension-Chess.Com/releases/latest'}" target="_blank" rel="noopener noreferrer">CẬP NHẬT</a>
@@ -1141,8 +1140,8 @@ export class ChatHUD {
       <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;background:#0d1117;border:1px solid rgba(255,255,255,0.08);border-radius:4px;margin-bottom:6px;font-size:11px;">
         <span style="color:#9ca3af;font-weight:600;">Bạn cầm quân:</span>
         <div style="display:flex;gap:4px;">
-          <button class="cm-side-btn" data-side="w" style="padding:3px 8px;font-size:10px;border-radius:2px;cursor:pointer;background:${activeSide === 'w' ? '#e59b2c' : '#1e222a'};color:${activeSide === 'w' ? '#000' : '#d1d5db'};border:1px solid rgba(255,255,255,0.1);font-weight:700;">⚪ TRẮNG</button>
-          <button class="cm-side-btn" data-side="b" style="padding:3px 8px;font-size:10px;border-radius:2px;cursor:pointer;background:${activeSide === 'b' ? '#e59b2c' : '#1e222a'};color:${activeSide === 'b' ? '#000' : '#d1d5db'};border:1px solid rgba(255,255,255,0.1);font-weight:700;">⚫ ĐEN</button>
+          <button class="cm-side-btn" data-side="w" style="padding:3px 8px;font-size:10px;border-radius:2px;cursor:pointer;background:${activeSide === 'w' ? '#e59b2c' : '#1e222a'};color:${activeSide === 'w' ? '#000' : '#d1d5db'};border:1px solid rgba(255,255,255,0.1);font-weight:700;">TRẮNG</button>
+          <button class="cm-side-btn" data-side="b" style="padding:3px 8px;font-size:10px;border-radius:2px;cursor:pointer;background:${activeSide === 'b' ? '#e59b2c' : '#1e222a'};color:${activeSide === 'b' ? '#000' : '#d1d5db'};border:1px solid rgba(255,255,255,0.1);font-weight:700;">ĐEN</button>
           <button class="cm-side-btn" data-side="auto" style="padding:3px 6px;font-size:10px;border-radius:2px;cursor:pointer;background:${!this.sideOverride ? '#374151' : '#1e222a'};color:${!this.sideOverride ? '#fff' : '#6b7280'};border:1px solid rgba(255,255,255,0.1);" title="Tự động nhận diện bên theo hướng xoay bàn cờ">TỰ ĐỘNG</button>
         </div>
       </div>
@@ -1166,7 +1165,7 @@ export class ChatHUD {
         <div class="cm-material-bar">
           <div class="cm-mat-scores">
             <span>Bạn: <strong style="color:#ffffff;">${myScore}đ</strong></span>
-            <span style="color:#64748b;">⚔️</span>
+            <span style="color:#64748b;font-weight:700;">VS</span>
             <span>Địch: <strong style="color:#ffffff;">${oppScore}đ</strong></span>
           </div>
           ${leadBadge}
@@ -1187,7 +1186,6 @@ export class ChatHUD {
 
       const efficiencyHtml = this.lastEfficiencyNote ? `
         <div style="display:flex;align-items:center;gap:6px;font-size:10.5px;font-weight:700;color:#38bdf8;background:rgba(56,189,248,0.08);border:1px solid rgba(56,189,248,0.25);border-radius:2px;padding:4px 8px;margin-top:2px;">
-          <span>⚡</span>
           <span>${this.lastEfficiencyNote}</span>
         </div>
       ` : '';
@@ -1197,9 +1195,9 @@ export class ChatHUD {
         const promoBoxHtml = translation.promotion ? `
           <div class="cm-promo-box">
             <div class="cm-promo-head">
-              <span class="cm-promo-title">⭐ KHUYÊN DÙNG: PHONG ${translation.promoName?.toUpperCase() || 'HẬU'} ${translation.promoSymbol || '👑'}</span>
+              <span class="cm-promo-title">KHUYÊN DÙNG: PHONG ${translation.promoName?.toUpperCase() || 'HẬU'}</span>
               ${translation.promotion !== 'q' 
-                ? '<span class="cm-promo-badge" style="background:rgba(239,68,68,0.2);color:#f87171;border-color:rgba(239,68,68,0.4);">⚡ UNDERPROMOTION</span>' 
+                ? '<span class="cm-promo-badge" style="background:rgba(239,68,68,0.2);color:#f87171;border-color:rgba(239,68,68,0.4);">UNDERPROMOTION</span>' 
                 : '<span class="cm-promo-badge">TỐI ƯU HỎA LỰC +9</span>'}
             </div>
             <div class="cm-promo-desc">

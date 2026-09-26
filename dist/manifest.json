@@ -24,7 +24,7 @@
   "content_scripts": [
     {
       "js": [
-        "assets/content.js-loader-BDUsQExv.js"
+        "assets/content.js-loader-DRtXNu1A.js"
       ],
       "matches": [
         "https://www.chess.com/*",
@@ -43,10 +43,10 @@
         "src/engine/*",
         "src/offscreen/*",
         "assets/stockfish-DDdgjDOu.js",
-        "assets/llm-client-CDOB8dke.js",
-        "assets/board-evaluator-BmEPwPFI.js",
-        "assets/engine-manager-Dsi34YoY.js",
-        "assets/content.js-BTfyoKXU.js"
+        "assets/llm-client-C5wotM8n.js",
+        "assets/board-evaluator-Cqia6-8m.js",
+        "assets/engine-manager-BRTk0WPO.js",
+        "assets/content.js-BYrmlZt-.js"
       ],
       "use_dynamic_url": false
     }

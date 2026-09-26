@@ -119,7 +119,7 @@ export function evaluateMoveStrategy({ fen, uci, evaluation, userColor = 'w' }) 
       // Dùng quân bé ăn quân to (VD: Tốt ăn Mã/Tượng/Xe/Hậu, Tượng/Mã ăn Xe/Hậu)
       return {
         type: 'material_gain',
-        badge: '⚡ ĂN CHẤT LỜI QUÂN',
+        badge: 'ĂN CHẤT LỜI QUÂN',
         color: '#22c55e',
         tag: `Lời +${Math.round(gain * 10) / 10}đ`,
         movedName: PIECE_FULL_NAMES[movedType] || 'Quân',
@@ -136,7 +136,7 @@ export function evaluateMoveStrategy({ fen, uci, evaluation, userColor = 'w' }) 
         // Đang hơn quân -> ĐỔI ĐỂ THẮNG
         return {
           type: 'trade_simplify',
-          badge: '💎 ĐỔI QUÂN ĐỂ THẮNG DỄ (SIMPLIFY)',
+          badge: 'ĐỔI QUÂN ĐỂ THẮNG DỄ (SIMPLIFY)',
           color: '#38bdf8',
           tag: 'Đơn giản hoá thế cờ',
           movedName: PIECE_FULL_NAMES[movedType] || 'Quân',
@@ -149,7 +149,7 @@ export function evaluateMoveStrategy({ fen, uci, evaluation, userColor = 'w' }) 
         // Đang thua quân -> CẨN TRỌNG KHI ĐỔI
         return {
           type: 'trade_caution',
-          badge: '⚠️ ĐỔI QUÂN ÉP BUỘC',
+          badge: 'ĐỔI QUÂN ÉP BUỘC',
           color: '#f59e0b',
           tag: 'Hóa giải áp lực',
           movedName: PIECE_FULL_NAMES[movedType] || 'Quân',
@@ -162,7 +162,7 @@ export function evaluateMoveStrategy({ fen, uci, evaluation, userColor = 'w' }) 
         // Thế cờ cân bằng
         return {
           type: 'trade_equal',
-          badge: '⚖️ ĐỔI QUÂN CÂN BẰNG',
+          badge: 'ĐỔI QUÂN CÂN BẰNG',
           color: '#a855f7',
           tag: 'Đổi quân sòng phẳng',
           movedName: PIECE_FULL_NAMES[movedType] || 'Quân',
@@ -181,7 +181,7 @@ export function evaluateMoveStrategy({ fen, uci, evaluation, userColor = 'w' }) 
     if (movedVal >= 3 && !targetType) {
       return {
         type: 'tactical_sacrifice',
-        badge: '🔥 THÍ QUÂN CHIẾN THUẬT (SACRIFICE)',
+        badge: 'THÍ QUÂN CHIẾN THUẬT (SACRIFICE)',
         color: '#ef4444',
         tag: 'Đột phá dứt điểm',
         movedName: PIECE_FULL_NAMES[movedType] || 'Quân',
@@ -196,7 +196,7 @@ export function evaluateMoveStrategy({ fen, uci, evaluation, userColor = 'w' }) 
     if (userColor === 'w' ? evalNum < 0 : evalNum > 0) {
       return {
         type: 'defense',
-        badge: '🛡️ PHÒNG THỦ BẢO TOÀN LỰC LƯỢNG',
+        badge: 'PHÒNG THỦ BẢO TOÀN LỰC LƯỢNG',
         color: '#eab308',
         tag: 'Gia cố an toàn',
         movedName: PIECE_FULL_NAMES[movedType] || 'Quân',
@@ -209,7 +209,7 @@ export function evaluateMoveStrategy({ fen, uci, evaluation, userColor = 'w' }) 
   // 5. Mặc định: KIỂM SOÁT THẾ TRẬN (Positional)
   return {
     type: 'positional',
-    badge: '♟️ PHÁT TRIỂN & KIỂM SOÁT KHÔNG GIAN',
+    badge: 'PHÁT TRIỂN & KIỂM SOÁT KHÔNG GIAN',
     color: '#10b981',
     tag: 'Tối ưu vị trí',
     movedName: PIECE_FULL_NAMES[movedType] || 'Quân',

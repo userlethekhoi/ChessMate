@@ -169,6 +169,10 @@ export class EngineManager {
     if (!frame) {
       frame = document.createElement('iframe');
       frame.id = 'chessmate-engine-frame';
+      frame._isReady = false;
+      frame.addEventListener('load', () => {
+        frame._isReady = true;
+      });
       frame.src = globalThis.chrome?.runtime?.getURL?.('src/offscreen/offscreen.html') || '';
       frame.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:none;opacity:0;pointer-events:none;z-index:-1;';
       (document.body || document.documentElement).appendChild(frame);
@@ -185,7 +189,13 @@ export class EngineManager {
       let isSettled = false;
 
       const onMessage = (event) => {
-        if (event.data?.target !== 'chessmate_content' || event.data?.id !== reqId) return;
+        if (event.data?.target !== 'chessmate_content') return;
+        if (event.data?.type === 'OFFSCREEN_READY') {
+          frame._isReady = true;
+          return;
+        }
+        if (event.data?.id !== reqId) return;
+
         isSettled = true;
         window.removeEventListener('message', onMessage);
         this.contentScriptPending = null;
@@ -233,11 +243,12 @@ export class EngineManager {
         }
       };
 
-      if (frame.contentDocument?.readyState === 'complete') {
+      // NEVER read frame.contentDocument as it triggers SecurityError: The operation is insecure
+      if (frame._isReady) {
         sendReq();
       } else {
         frame.addEventListener('load', sendReq, { once: true });
-        setTimeout(sendReq, 80);
+        setTimeout(sendReq, 100);
       }
 
       setTimeout(() => {

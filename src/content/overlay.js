@@ -99,19 +99,19 @@ export class Overlay {
     }
 
     if (promoChar) {
-      const promoIcons = {
-        q: { label: 'Phong Hậu', icon: '👑', color: '#c084fc' },
-        n: { label: 'Phong Mã', icon: '♞', color: '#f59e0b' },
-        r: { label: 'Phong Xe', icon: '♜', color: '#38bdf8' },
-        b: { label: 'Phong Tượng', icon: '♝', color: '#34d399' }
+      const promoLabels = {
+        q: { label: 'PHONG HẬU', color: '#c084fc' },
+        n: { label: 'PHONG MÃ', color: '#f59e0b' },
+        r: { label: 'PHONG XE', color: '#38bdf8' },
+        b: { label: 'PHONG TƯỢNG', color: '#34d399' }
       };
-      const pInfo = promoIcons[promoChar] || promoIcons.q;
+      const pInfo = promoLabels[promoChar] || promoLabels.q;
       const badgeY = q.y + (flipped ? 46 : -46);
       promoBadgeHtml = `
         <g transform="translate(${q.x}, ${badgeY})" filter="url(#cm-glow)">
-          <rect x="-50" y="-15" width="100" height="30" rx="15" fill="#0f172a" stroke="${pInfo.color}" stroke-width="2.5" opacity="0.96"/>
-          <text x="0" y="5.5" text-anchor="middle" fill="#ffffff" font-size="13" font-weight="800" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif">
-            ${pInfo.icon} ${pInfo.label}
+          <rect x="-48" y="-14" width="96" height="28" rx="4" fill="#0f172a" stroke="${pInfo.color}" stroke-width="2" opacity="0.96"/>
+          <text x="0" y="4.5" text-anchor="middle" fill="#ffffff" font-size="11" font-weight="700" letter-spacing="0.5px" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif">
+            ${pInfo.label}
           </text>
         </g>
       `;

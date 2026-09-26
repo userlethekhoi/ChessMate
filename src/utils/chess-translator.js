@@ -118,17 +118,17 @@ export function translateMoveToVietnamese(uci, fen = null) {
 
   if (promotion) {
     const promoMap = {
-      q: { name: 'Hậu', symbol: '👑', desc: 'Tối ưu hóa sức mạnh áp đảo để dồn ép và kết liễu ván đấu nhanh nhất.' },
-      n: { name: 'Mã', symbol: '♞', desc: 'Độc chiêu Underpromotion! Tận dụng bước nhảy chữ L tạo đòn bắt đôi (Fork) hoặc chiếu bất ngờ, đồng thời tránh bẫy Pat hòa cờ.' },
-      r: { name: 'Xe', symbol: '♜', desc: 'Kỹ thuật Underpromotion! Tránh bẫy Pat (Stalemate hòa cờ nếu phong Hậu) và duy trì thế thắng ép góc tuyệt đối.' },
-      b: { name: 'Tượng', symbol: '♝', desc: 'Kỹ thuật Underpromotion tinh tế! Tránh hòa cờ và kiểm soát đường chéo chiến lược để bóp nghẹt đối thủ.' }
+      q: { name: 'Hậu', symbol: 'Q', desc: 'Tối ưu hóa sức mạnh áp đảo để dồn ép và kết liễu ván đấu nhanh nhất.' },
+      n: { name: 'Mã', symbol: 'N', desc: 'Độc chiêu Underpromotion! Tận dụng bước nhảy chữ L tạo đòn bắt đôi (Fork) hoặc chiếu bất ngờ, đồng thời tránh bẫy Pat hòa cờ.' },
+      r: { name: 'Xe', symbol: 'R', desc: 'Kỹ thuật Underpromotion! Tránh bẫy Pat (Stalemate hòa cờ nếu phong Hậu) và duy trì thế thắng ép góc tuyệt đối.' },
+      b: { name: 'Tượng', symbol: 'B', desc: 'Kỹ thuật Underpromotion tinh tế! Tránh hòa cờ và kiểm soát đường chéo chiến lược để bóp nghẹt đối thủ.' }
     };
     const promoInfo = promoMap[promotion] || promoMap.q;
 
     if (targetPiece) {
       const targetName = PIECE_NAMES_VI[targetPiece.toLowerCase()] || 'quân đối phương';
       return {
-        title: `${pieceName} ở ô ${fromUpper} ăn ${targetName} tại ô ${toUpper} ➔ Phong ${promoInfo.name} ${promoInfo.symbol}`,
+        title: `${pieceName} ở ô ${fromUpper} ăn ${targetName} tại ô ${toUpper} -> Phong ${promoInfo.name}`,
         short: `${fromUpper}x${toUpper}=${promotion.toUpperCase()}`,
         piece: pieceName,
         promotion,
@@ -139,7 +139,7 @@ export function translateMoveToVietnamese(uci, fen = null) {
     }
 
     return {
-      title: `${pieceName} ở ô ${fromUpper} tiến lên ô ${toUpper} ➔ Phong ${promoInfo.name} ${promoInfo.symbol}`,
+      title: `${pieceName} ở ô ${fromUpper} tiến lên ô ${toUpper} -> Phong ${promoInfo.name}`,
       short: `${fromUpper}->${toUpper}=${promotion.toUpperCase()}`,
       piece: pieceName,
       promotion,

@@ -68,27 +68,27 @@ test('translateMoveToVietnamese handles all Promotion cases (Queen, Knight, Rook
   const resQ = translateMoveToVietnamese('e7e8q', fen1);
   assert.equal(resQ.promotion, 'q');
   assert.equal(resQ.promoName, 'Hậu');
-  assert.ok(resQ.title.includes('Phong Hậu 👑'));
+  assert.ok(resQ.title.includes('Phong Hậu'));
 
   // 2. Knight underpromotion (Fork or Check)
   const resN = translateMoveToVietnamese('e7e8n', fen1);
   assert.equal(resN.promotion, 'n');
   assert.equal(resN.promoName, 'Mã');
-  assert.ok(resN.title.includes('Phong Mã ♞'));
+  assert.ok(resN.title.includes('Phong Mã'));
   assert.ok(resN.desc.includes('Underpromotion'));
 
   // 3. Rook underpromotion (Avoid stalemate)
   const resR = translateMoveToVietnamese('e7e8r', fen1);
   assert.equal(resR.promotion, 'r');
   assert.equal(resR.promoName, 'Xe');
-  assert.ok(resR.title.includes('Phong Xe ♜'));
+  assert.ok(resR.title.includes('Phong Xe'));
   assert.ok(resR.desc.includes('bẫy Pat'));
 
   // 4. Bishop underpromotion
   const resB = translateMoveToVietnamese('e7e8b', fen1);
   assert.equal(resB.promotion, 'b');
   assert.equal(resB.promoName, 'Tượng');
-  assert.ok(resB.title.includes('Phong Tượng ♝'));
+  assert.ok(resB.title.includes('Phong Tượng'));
 
   // 5. Capture + Promotion (d7xe8=Q where e8 has a black rook 'r')
   // Rank 8: 4 squares empty (a8..d8), 'r' on e8, 3 squares empty (f8..h8) -> '4r3'
@@ -96,11 +96,11 @@ test('translateMoveToVietnamese handles all Promotion cases (Queen, Knight, Rook
   const fenCapture = '4r3/3P4/8/8/8/8/8/4K2k w - - 0 1';
   const resCapture = translateMoveToVietnamese('d7e8q', fenCapture);
   assert.equal(resCapture.promotion, 'q');
-  assert.ok(resCapture.title.includes('ăn Xe tại ô E8 ➔ Phong Hậu 👑'));
+  assert.ok(resCapture.title.includes('ăn Xe tại ô E8 -> Phong Hậu'));
   assert.equal(resCapture.short, 'D7xE8=Q');
 
   // 6. Auto-detect pawn reaching 8th rank without 5th char
   const resAuto = translateMoveToVietnamese('e7e8', fen1);
   assert.equal(resAuto.promotion, 'q');
-  assert.ok(resAuto.title.includes('Phong Hậu 👑'));
+  assert.ok(resAuto.title.includes('Phong Hậu'));
 });
